@@ -1,19 +1,12 @@
 """
 ================================================================================
-FIONAH ENGINE v1.0 — Football Intelligence & Odds Normalization Heuristic Arch.
+FIONAH ENGINE v1.2 — Football Intelligence & Odds Normalization Heuristic Arch.
 10-Pillar Quantitative Syndicate · Zero LLM Math · Built-in Difflib Entity Resolution
 Dixon-Coles Bivariate Poisson · Shin De-vigging · Fractional Kelly Acca Builder
+Bulletproof Batch Processing with Per-Fixture Error Isolation
 ================================================================================
 """
-import os
-import re
-import math
-import time
-import json
-import difflib
-import urllib.request
-import urllib.parse
-import datetime as dt
+import os, re, math, time, json, difflib, urllib.request, urllib.parse, datetime as dt
 from pathlib import Path
 from typing import List, Optional, Dict, Any, Tuple
 from fastapi import FastAPI, HTTPException
@@ -21,97 +14,57 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse, JSONResponse
 from pydantic import BaseModel
 
-# ─── APP SETUP ─────────────────────────────────────────────────────────────
-app = FastAPI(title="FIONAH ENGINE", version="1.0.0")
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=["*"],
-    allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
-)
+app = FastAPI(title="FIONAH ENGINE", version="1.2.0")
+app.add_middleware(CORSMiddleware, allow_origins=["*"], allow_credentials=True, allow_methods=["*"], allow_headers=["*"])
 
-# ─── CALIBRATED PRIORS ─────────────────────────────────────────────────────
 DEFAULT_LAMBDA_HOME, DEFAULT_LAMBDA_AWAY, DEFAULT_RHO = 1.38, 1.12, -0.055
 
 INTL_ELO_SEEDS: Dict[str, float] = {
-    "argentina": 2150, "france": 2120, "spain": 2115, "england": 2045,
-    "brazil": 2040, "belgium": 1980, "netherlands": 1975, "portugal": 1970,
-    "colombia": 1960, "italy": 1950, "uruguay": 1940, "germany": 1935,
-    "croatia": 1910, "morocco": 1895, "japan": 1885, "senegal": 1855,
-    "usa": 1845, "united states": 1845, "mexico": 1840, "switzerland": 1835,
-    "denmark": 1820, "austria": 1815, "korea republic": 1805, "south korea": 1805,
-    "iran": 1795, "australia": 1785, "turkey": 1775, "ukraine": 1770,
-    "nigeria": 1760, "egypt": 1750, "ivory coast": 1745, "cameroon": 1730,
-    "algeria": 1725, "ghana": 1710, "ecuador": 1830, "chile": 1790,
-    "paraguay": 1765, "peru": 1760, "venezuela": 1740, "bolivia": 1610,
-    "kenya": 1395, "uganda": 1410, "tanzania": 1365, "south africa": 1690,
+    "argentina": 2150, "france": 2120, "spain": 2115, "england": 2045, "brazil": 2040, "belgium": 1980,
+    "netherlands": 1975, "portugal": 1970, "colombia": 1960, "italy": 1950, "uruguay": 1940, "germany": 1935,
+    "croatia": 1910, "morocco": 1895, "japan": 1885, "senegal": 1855, "usa": 1845, "united states": 1845,
+    "mexico": 1840, "switzerland": 1835, "denmark": 1820, "austria": 1815, "korea republic": 1805,
+    "south korea": 1805, "iran": 1795, "australia": 1785, "turkey": 1775, "ukraine": 1770,
+    "nigeria": 1760, "egypt": 1750, "ivory coast": 1745, "cameroon": 1730, "algeria": 1725,
+    "ghana": 1710, "ecuador": 1830, "chile": 1790, "paraguay": 1765, "peru": 1760,
+    "venezuela": 1740, "bolivia": 1610, "kenya": 1395, "uganda": 1410, "tanzania": 1365, "south africa": 1690,
 }
 
 CLUB_ELO_SEEDS: Dict[str, float] = {
-    "manchester city": 2060, "real madrid": 2050, "arsenal": 2005,
-    "liverpool": 1990, "bayern munich": 1985, "inter": 1975, "inter milan": 1975,
-    "barcelona": 1975, "bayer leverkusen": 1965, "paris saint-germain": 1955,
-    "paris saint germain": 1955, "paris st germain": 1955, "psg": 1955,
-    "atletico madrid": 1930, "borussia dortmund": 1910, "dortmund": 1910,
-    "juventus": 1895, "chelsea": 1890, "aston villa": 1880, "tottenham": 1870,
-    "tottenham hotspur": 1870, "ac milan": 1865, "newcastle": 1860,
-    "sporting cp": 1860, "sporting lisbon": 1860, "manchester united": 1850,
-    "atalanta": 1845, "crvena zvezda": 1770, "red star belgrade": 1770,
-    "rb leipzig": 1840, "benfica": 1835, "sl benfica": 1835, "roma": 1830,
-    "as roma": 1830, "real sociedad": 1825, "villarreal": 1820,
-    "fc porto": 1820, "porto": 1820, "brighton": 1815, "west ham": 1800,
-    "marseille": 1795, "olympique marseille": 1795, "feyenoord": 1785,
-    "psv": 1780, "psv eindhoven": 1780, "celtic": 1750, "rangers": 1740,
-    "bournemouth": 1735, "afc bournemouth": 1735, "bologna": 1765,
-    "lazio": 1770, "fiorentina": 1765, "acf fiorentina": 1765, "napoli": 1860,
-    "torino": 1720, "monaco": 1820, "as monaco": 1820, "lille": 1805,
-    "lyon": 1770, "olympique lyon": 1770, "olympique lyonnais": 1770,
-    "rennes": 1730, "stade rennais": 1730, "lens": 1775, "sevilla": 1760,
-    "athletic bilbao": 1815, "athletic club": 1815, "real betis": 1765,
-    "betis": 1765, "valencia": 1660, "girona": 1805,
-    "eintracht frankfurt": 1785, "eintracht fr": 1785,
-    "stuttgart": 1800, "vfb stuttgart": 1800, "wolfsburg": 1735,
-    "freiburg": 1740, "sc freiburg": 1740, "werder bremen": 1655,
-    "augsburg": 1650, "hamburg": 1620,
-    "1. fc cologne": 1635, "1. fc koln": 1635, "cologne": 1635, "koln": 1635,
-    "borussia (mg)": 1650, "borussia mg": 1650,
-    "borussia monchengladbach": 1650, "mainz": 1640, "mainz 05": 1640,
-    "brest": 1735, "stade brestois": 1735, "parma": 1630, "genoa": 1640,
-    "auxerre": 1610, "lorient": 1610, "venezia": 1590,
-    "deportivo a coruna": 1570, "deportivo la coruna": 1570, "le mans": 1480,
-    "ferencvaros": 1690, "viktoria plzen": 1680, "sparta prague": 1720,
-    "slavia prague": 1735, "union saint-gilloise": 1740, "club brugge": 1755,
-    "anderlecht": 1715, "nec nijmegen": 1600, "vasco da gama": 1710,
-    "flamengo": 1780, "palmeiras": 1790, "fluminense": 1740,
-    "sao paulo": 1735, "corinthians": 1720, "river plate": 1775,
-    "boca juniors": 1760, "wimbledon": 1450, "mk dons": 1460,
-    "bastia": 1580, "cannes": 1450, "elana torun": 1420,
-    "lech ii poznan": 1470, "lech poznan": 1690, "lecce": 1540,
-    "sassuolo": 1610, "empoli": 1560, "salernitana": 1490,
-    "nottingham forest": 1810, "fulham": 1770, "crystal palace": 1755,
-    "leeds": 1700, "leicester": 1740, "southampton": 1690, "sunderland": 1680,
+    "manchester city": 2060, "real madrid": 2050, "arsenal": 2005, "liverpool": 1990, "bayern munich": 1985,
+    "inter": 1975, "inter milan": 1975, "barcelona": 1975, "bayer leverkusen": 1965, "paris saint-germain": 1955,
+    "paris saint germain": 1955, "paris st germain": 1955, "psg": 1955, "atletico madrid": 1930,
+    "borussia dortmund": 1910, "dortmund": 1910, "juventus": 1895, "chelsea": 1890, "aston villa": 1880,
+    "tottenham": 1870, "tottenham hotspur": 1870, "ac milan": 1865, "newcastle": 1860, "sporting cp": 1860,
+    "sporting lisbon": 1860, "manchester united": 1850, "atalanta": 1845, "crvena zvezda": 1770,
+    "red star belgrade": 1770, "rb leipzig": 1840, "benfica": 1835, "sl benfica": 1835, "roma": 1830,
+    "as roma": 1830, "real sociedad": 1825, "villarreal": 1820, "fc porto": 1820, "porto": 1820,
+    "brighton": 1815, "west ham": 1800, "marseille": 1795, "olympique marseille": 1795, "feyenoord": 1785,
+    "psv": 1780, "psv eindhoven": 1780, "celtic": 1750, "rangers": 1740, "bournemouth": 1735,
+    "afc bournemouth": 1735, "bologna": 1765, "lazio": 1770, "fiorentina": 1765, "acf fiorentina": 1765,
+    "napoli": 1860, "torino": 1720, "monaco": 1820, "as monaco": 1820, "lille": 1805, "lyon": 1770,
+    "olympique lyon": 1770, "olympique lyonnais": 1770, "rennes": 1730, "stade rennais": 1730,
+    "lens": 1775, "sevilla": 1760, "athletic bilbao": 1815, "athletic club": 1815, "real betis": 1765,
+    "betis": 1765, "valencia": 1660, "girona": 1805, "eintracht frankfurt": 1785, "eintracht fr": 1785,
+    "stuttgart": 1800, "vfb stuttgart": 1800, "wolfsburg": 1735, "freiburg": 1740, "sc freiburg": 1740,
+    "werder bremen": 1655, "augsburg": 1650, "hamburg": 1620, "1. fc cologne": 1635, "1. fc koln": 1635,
+    "cologne": 1635, "koln": 1635, "borussia (mg)": 1650, "borussia mg": 1650, "borussia monchengladbach": 1650,
+    "mainz": 1640, "mainz 05": 1640, "brest": 1735, "stade brestois": 1735, "parma": 1630, "genoa": 1640,
+    "auxerre": 1610, "lorient": 1610, "venezia": 1590, "deportivo a coruna": 1570, "deportivo la coruna": 1570,
+    "le mans": 1480, "ferencvaros": 1690, "viktoria plzen": 1680, "sparta prague": 1720, "slavia prague": 1735,
+    "union saint-gilloise": 1740, "club brugge": 1755, "anderlecht": 1715, "nec nijmegen": 1600,
+    "vasco da gama": 1710, "flamengo": 1780, "palmeiras": 1790, "fluminense": 1740, "sao paulo": 1735,
+    "corinthians": 1720, "river plate": 1775, "boca juniors": 1760, "wimbledon": 1450, "mk dons": 1460,
+    "bastia": 1580, "cannes": 1450, "elana torun": 1420, "lech ii poznan": 1470, "lech poznan": 1690,
+    "lecce": 1540, "sassuolo": 1610, "empoli": 1560, "salernitana": 1490
 }
 
-# ─── AGENT 1: ENTITY VERIFICATION ──────────────────────────────────────────
-UI_CHROME_PATTERNS = [
-    re.compile(r"^\+?\s*\d+\s*(markets|more|events|games|bets|selections)", re.I),
-    re.compile(r"^[•\-\*]\s+.*(?:liga|league|division|serie|cup|conference|tier)", re.I),
-    re.compile(r"^(live|in[-\s]?play|prematch|cash\s*out|edit\s*bet|my\s*bets)", re.I),
-    re.compile(r"^(popular|featured|top\s*picks|trending|hot|suggested)", re.I),
-    re.compile(r"^(both\s*teams|over|under|correct\s*score|double\s*chance|asian)", re.I),
-    re.compile(r"^\s*\d{1,2}:\d{2}\s*(am|pm|gmt|utc)?\s*$", re.I),
-    re.compile(r"^\s*(mon|tue|wed|thu|fri|sat|sun)\w*\s+\d{1,2}\s+\w+", re.I),
-]
-
 def is_valid_team_name(s: str) -> bool:
-    if not s or len(s.strip()) < 2: return False
+    if not s or len(s.strip()) < 3: return False
     s = s.strip()
     if re.match(r"^\d+\.?\d*$", s): return False
     if not re.search(r"[a-zA-Z]", s): return False
-    if s.lower() in {"draw", "home", "away", "yes", "no", "over", "under"}: return False
-    for p in UI_CHROME_PATTERNS:
-        if p.match(s): return False
+    if s.lower() in {"draw", "home", "away", "yes", "no", "over", "under", "total", "goals", "handicap", "asian", "corner", "cards", "1x2", "x-up", "boosted"}: return False
     return True
 
 def normalize_name(s: str) -> str:
@@ -124,8 +77,7 @@ def normalize_name(s: str) -> str:
 
 def verify_team_entity(team_name: str, domain: str = "domestic") -> Dict[str, Any]:
     if not is_valid_team_name(team_name):
-        return {"verified": False, "source": "invalid_name", "canonical": team_name, "elo": 0.0,
-                "reason": "Fails basic validation"}
+        return {"verified": False, "source": "invalid_name", "canonical": team_name, "elo": 0.0, "reason": "Fails basic validation"}
     clean = normalize_name(team_name)
     seeds = INTL_ELO_SEEDS if domain == "international" else CLUB_ELO_SEEDS
     canonical_list = list(seeds.keys())
@@ -134,10 +86,8 @@ def verify_team_entity(team_name: str, domain: str = "domestic") -> Dict[str, An
     matches = difflib.get_close_matches(clean, canonical_list, n=1, cutoff=0.75)
     if matches:
         return {"verified": True, "source": "difflib_fuzzy", "canonical": matches[0].title(), "elo": seeds[matches[0]]}
-    return {"verified": False, "source": "no_canonical_match", "canonical": team_name, "elo": 0.0,
-            "reason": "No match in canonical registry (confidence < 75%). Hard rejected."}
+    return {"verified": False, "source": "no_canonical_match", "canonical": team_name, "elo": 0.0, "reason": "No match in canonical registry (confidence < 75%). Hard rejected."}
 
-# ─── AGENT 3: REST & VAEP ADJUSTMENTS ──────────────────────────────────────
 def apply_fatigue_and_rest(lambda_base: float, rest_days: int, opponent_rest_days: int) -> float:
     if rest_days <= 3 and opponent_rest_days >= 6: return round(lambda_base * 0.88, 3)
     if rest_days <= 3 and opponent_rest_days <= 3: return round(lambda_base * 0.94, 3)
@@ -146,12 +96,10 @@ def apply_fatigue_and_rest(lambda_base: float, rest_days: int, opponent_rest_day
 def apply_vaep_injury_adjustment(lambda_base: float, vaep_delta: float) -> float:
     return round(lambda_base * (1.0 + vaep_delta), 3)
 
-# ─── AGENT 4: SHIN DE-BIASING ──────────────────────────────────────────────
 def de_vig_odds_shin(odds_h: float, odds_d: float, odds_a: float) -> Tuple[Dict[str, float], float, float]:
     oh, od, oa = max(1.01, odds_h), max(1.01, odds_d), max(1.01, odds_a)
     inv_h, inv_d, inv_a = 1.0 / oh, 1.0 / od, 1.0 / oa
     overround = inv_h + inv_d + inv_a
-    margin = overround - 1.0
     z = 0.0
     for _ in range(40):
         def f(zv):
@@ -171,9 +119,8 @@ def de_vig_odds_shin(odds_h: float, odds_d: float, odds_a: float) -> Tuple[Dict[
     pd = max(0.01, final_p(inv_d))
     pa = max(0.01, final_p(inv_a))
     tot = ph + pd + pa
-    return {"1": ph / tot, "X": pd / tot, "2": pa / tot}, margin, z
+    return {"1": ph / tot, "X": pd / tot, "2": pa / tot}, overround - 1.0, z
 
-# ─── AGENT 5: DIXON-COLES ──────────────────────────────────────────────────
 def dixon_coles_tau(x: int, y: int, lambda_h: float, mu_a: float, rho: float) -> float:
     if x == 0 and y == 0: return max(0.0, 1.0 - lambda_h * mu_a * rho)
     if x == 0 and y == 1: return 1.0 + lambda_h * rho
@@ -205,12 +152,8 @@ def calculate_dixon_coles_grid(lambda_h: float, mu_a: float, rho: float = -0.055
     if total > 0:
         p_home /= total; p_draw /= total; p_away /= total
         p_btts /= total; p_over15 /= total; p_over25 /= total
-    return {"p_home": p_home, "p_draw": p_draw, "p_away": p_away,
-            "p_btts": p_btts, "p_over15": p_over15, "p_over25": p_over25,
-            "p_1X": p_home + p_draw, "p_X2": p_away + p_draw,
-            "lambda_home": lambda_h, "lambda_away": mu_a}
+    return {"p_home": p_home, "p_draw": p_draw, "p_away": p_away, "p_btts": p_btts, "p_over15": p_over15, "p_over25": p_over25, "p_1X": p_home + p_draw, "p_X2": p_away + p_draw, "lambda_home": lambda_h, "lambda_away": mu_a}
 
-# ─── AGENT 6: VALUE DETECTION ──────────────────────────────────────────────
 def evaluate_1x2_value(p_h, p_d, p_a, fair_h, fair_d, fair_a, market_h, market_d, market_a, total_xg, home, away):
     eff_h = market_h if (market_h and market_h > 1.05) else fair_h
     eff_d = market_d if (market_d and market_d > 1.05) else fair_d
@@ -219,32 +162,17 @@ def evaluate_1x2_value(p_h, p_d, p_a, fair_h, fair_d, fair_a, market_h, market_d
     is_stalemate = (total_xg <= 2.40 and abs(p_h - p_a) <= 0.16)
     is_tactical_draw = (p_d >= 0.275 and eff_d >= 2.90 and (ev_d >= -0.04 or is_stalemate))
     if is_tactical_draw and (ev_d >= 0.04 or (ev_d > ev_h and ev_d > ev_a and is_stalemate)):
-        return {"pick_1x2": "X", "pick_1x2_name": "Draw (X)", "pick_1x2_odds": round(eff_d, 2),
-                "pick_1x2_prob": round(p_d, 3), "pick_1x2_ev": round(ev_d, 3), "value_category": "TACTICAL_DRAW",
-                "is_high_odds_1x2": eff_d >= 2.50, "high_odds_reason": f"Tactical Draw: {p_d*100:.1f}% density. EV {ev_d*100:+.1f}%."}
+        return {"pick_1x2": "X", "pick_1x2_name": "Draw (X)", "pick_1x2_odds": round(eff_d, 2), "pick_1x2_prob": round(p_d, 3), "pick_1x2_ev": round(ev_d, 3), "value_category": "TACTICAL_DRAW", "is_high_odds_1x2": eff_d >= 2.50, "high_odds_reason": f"Tactical Draw: {p_d*100:.1f}% density. EV {ev_d*100:+.1f}%."}
     if p_a >= 0.27 and eff_a >= 2.65 and ev_a >= max(ev_h, ev_d):
-        return {"pick_1x2": "2", "pick_1x2_name": f"{away} (2)", "pick_1x2_odds": round(eff_a, 2),
-                "pick_1x2_prob": round(p_a, 3), "pick_1x2_ev": round(ev_a, 3), "value_category": "VALUE_UNDERDOG",
-                "is_high_odds_1x2": True, "high_odds_reason": f"Value Away Underdog: {p_a*100:.1f}% at {eff_a:.2f}."}
+        return {"pick_1x2": "2", "pick_1x2_name": f"{away} (2)", "pick_1x2_odds": round(eff_a, 2), "pick_1x2_prob": round(p_a, 3), "pick_1x2_ev": round(ev_a, 3), "value_category": "VALUE_UNDERDOG", "is_high_odds_1x2": True, "high_odds_reason": f"Value Away Underdog: {p_a*100:.1f}% at {eff_a:.2f}."}
     if p_h >= 0.28 and eff_h >= 2.50 and ev_h >= max(ev_d, ev_a):
-        return {"pick_1x2": "1", "pick_1x2_name": f"{home} (1)", "pick_1x2_odds": round(eff_h, 2),
-                "pick_1x2_prob": round(p_h, 3), "pick_1x2_ev": round(ev_h, 3), "value_category": "VALUE_UNDERDOG",
-                "is_high_odds_1x2": True, "high_odds_reason": f"Value Home Underdog: {p_h*100:.1f}% at {eff_h:.2f}."}
+        return {"pick_1x2": "1", "pick_1x2_name": f"{home} (1)", "pick_1x2_odds": round(eff_h, 2), "pick_1x2_prob": round(p_h, 3), "pick_1x2_ev": round(ev_h, 3), "value_category": "VALUE_UNDERDOG", "is_high_odds_1x2": True, "high_odds_reason": f"Value Home Underdog: {p_h*100:.1f}% at {eff_h:.2f}."}
     if p_h >= p_d and p_h >= p_a:
-        return {"pick_1x2": "1", "pick_1x2_name": f"{home} (1)", "pick_1x2_odds": round(eff_h, 2),
-                "pick_1x2_prob": round(p_h, 3), "pick_1x2_ev": round(ev_h, 3),
-                "value_category": "VALUE_FAVORITE" if p_h >= 0.50 else "BALANCED",
-                "is_high_odds_1x2": eff_h >= 2.50, "high_odds_reason": None}
+        return {"pick_1x2": "1", "pick_1x2_name": f"{home} (1)", "pick_1x2_odds": round(eff_h, 2), "pick_1x2_prob": round(p_h, 3), "pick_1x2_ev": round(ev_h, 3), "value_category": "VALUE_FAVORITE" if p_h >= 0.50 else "BALANCED", "is_high_odds_1x2": eff_h >= 2.50, "high_odds_reason": None}
     if p_a >= p_h and p_a >= p_d:
-        return {"pick_1x2": "2", "pick_1x2_name": f"{away} (2)", "pick_1x2_odds": round(eff_a, 2),
-                "pick_1x2_prob": round(p_a, 3), "pick_1x2_ev": round(ev_a, 3),
-                "value_category": "VALUE_FAVORITE" if p_a >= 0.48 else "BALANCED",
-                "is_high_odds_1x2": eff_a >= 2.50, "high_odds_reason": None}
-    return {"pick_1x2": "X", "pick_1x2_name": "Draw (X)", "pick_1x2_odds": round(eff_d, 2),
-            "pick_1x2_prob": round(p_d, 3), "pick_1x2_ev": round(ev_d, 3), "value_category": "TACTICAL_DRAW",
-            "is_high_odds_1x2": eff_d >= 2.50, "high_odds_reason": f"Symmetrical → {p_d*100:.1f}% draw."}
+        return {"pick_1x2": "2", "pick_1x2_name": f"{away} (2)", "pick_1x2_odds": round(eff_a, 2), "pick_1x2_prob": round(p_a, 3), "pick_1x2_ev": round(ev_a, 3), "value_category": "VALUE_FAVORITE" if p_a >= 0.48 else "BALANCED", "is_high_odds_1x2": eff_a >= 2.50, "high_odds_reason": None}
+    return {"pick_1x2": "X", "pick_1x2_name": "Draw (X)", "pick_1x2_odds": round(eff_d, 2), "pick_1x2_prob": round(p_d, 3), "pick_1x2_ev": round(ev_d, 3), "value_category": "TACTICAL_DRAW", "is_high_odds_1x2": eff_d >= 2.50, "high_odds_reason": f"Symmetrical → {p_d*100:.1f}% draw."}
 
-# ─── DATA MODELS ───────────────────────────────────────────────────────────
 class FixtureInput(BaseModel):
     id: Optional[str] = None
     home: str
@@ -261,77 +189,92 @@ class FixtureInput(BaseModel):
 class BatchPredictionRequest(BaseModel):
     fixtures: List[FixtureInput]
 
-# ─── CORE PREDICTOR ────────────────────────────────────────────────────────
+# ─── BULLETPROOF CORE PREDICTOR ──────────────────────────────────────────────
 def predict_fixture(f: FixtureInput) -> Dict[str, Any]:
-    domain = "international" if any(k in (f.league or "").lower() for k in ["world cup", "euro", "copa", "nations"]) else "domestic"
-    v_home = verify_team_entity(f.home, domain)
-    v_away = verify_team_entity(f.away, domain)
-    if not (v_home["verified"] and v_away["verified"]):
-        return {"id": f.id or f"{f.home}-{f.away}", "home": f.home, "away": f.away,
-                "verified": False, "verification": {"home": v_home, "away": v_away},
-                "reject_reason": f"Home: {v_home['reason']}. Away: {v_away['reason']}",
-                "primary_pick": "NO BET", "confidence_tier": "REJECTED", "acca_eligible": False}
-    elo_h, elo_a = v_home["elo"], v_away["elo"]
-    elo_diff = (elo_h + 60.0) - elo_a
-    lambda_h = DEFAULT_LAMBDA_HOME * (10.0 ** (elo_diff / 1000.0))
-    lambda_a = DEFAULT_LAMBDA_AWAY * (10.0 ** (-elo_diff / 1000.0))
-    lambda_h = apply_fatigue_and_rest(lambda_h, f.rest_days_home, f.rest_days_away)
-    lambda_a = apply_fatigue_and_rest(lambda_a, f.rest_days_away, f.rest_days_home)
-    lambda_h = apply_vaep_injury_adjustment(lambda_h, f.vaep_delta_home)
-    lambda_a = apply_vaep_injury_adjustment(lambda_a, f.vaep_delta_away)
-    has_odds = (f.odds_home and f.odds_draw and f.odds_away and f.odds_home > 1.05)
-    fair_market, margin, z_shin = de_vig_odds_shin(f.odds_home, f.odds_draw, f.odds_away) if has_odds else (None, 0.05, 0.02)
-    dc = calculate_dixon_coles_grid(lambda_h, lambda_a, rho=DEFAULT_RHO)
-    if fair_market:
-        p_home = (dc["p_home"] * 0.35) + (fair_market["1"] * 0.65)
-        p_draw = (dc["p_draw"] * 0.35) + (fair_market["X"] * 0.65)
-        p_away = (dc["p_away"] * 0.35) + (fair_market["2"] * 0.65)
-        tot = p_home + p_draw + p_away
-        p_home /= tot; p_draw /= tot; p_away /= tot
-    else:
-        p_home, p_draw, p_away = dc["p_home"], dc["p_draw"], dc["p_away"]
-    fair_odds_h = round(1.0 / max(0.01, p_home), 2)
-    fair_odds_d = round(1.0 / max(0.01, p_draw), 2)
-    fair_odds_a = round(1.0 / max(0.01, p_away), 2)
-    val_1x2 = evaluate_1x2_value(p_home, p_draw, p_away, fair_odds_h, fair_odds_d, fair_odds_a,
-                                 f.odds_home, f.odds_draw, f.odds_away, lambda_h + lambda_a, f.home, f.away)
-    primary_pick, pick_odds, primary_prob, tier = "NO BET", 1.35, 0.0, "CANDIDATE"
-    if p_home >= 0.64:
-        primary_pick, pick_odds, primary_prob = f"{f.home} (1)", f.odds_home or fair_odds_h, p_home
-        tier = "ELITE" if p_home >= 0.72 else "STRONG"
-    elif p_away >= 0.60:
-        primary_pick, pick_odds, primary_prob = f"{f.away} (2)", f.odds_away or fair_odds_a, p_away
-        tier = "ELITE" if p_away >= 0.68 else "STRONG"
-    else:
-        p_1x, p_x2 = p_home + p_draw, p_away + p_draw
-        if p_1x >= 0.72 and p_home >= p_away:
-            primary_pick, pick_odds, primary_prob = f"{f.home} or Draw (1X)", max(1.20, min(1.80, round(1.0/p_1x, 2))), p_1x
-            tier = "STRONG" if p_1x >= 0.78 else "CANDIDATE"
-        elif p_x2 >= 0.70 and p_away >= p_home:
-            primary_pick, pick_odds, primary_prob = f"{f.away} or Draw (X2)", max(1.20, min(1.80, round(1.0/p_x2, 2))), p_x2
-            tier = "STRONG" if p_x2 >= 0.76 else "CANDIDATE"
+    try:
+        domain = "international" if any(k in (f.league or "").lower() for k in ["world cup", "euro", "copa", "nations"]) else "domestic"
+        v_home = verify_team_entity(f.home, domain)
+        v_away = verify_team_entity(f.away, domain)
+        
+        if not (v_home["verified"] and v_away["verified"]):
+            return {"id": f.id or f"{f.home}-{f.away}", "home": f.home, "away": f.away, "verified": False,
+                    "verification": {"home": v_home, "away": v_away},
+                    "reject_reason": f"Home: {v_home.get('reason', 'Unverified')}. Away: {v_away.get('reason', 'Unverified')}",
+                    "primary_pick": "NO BET", "confidence_tier": "REJECTED", "acca_eligible": False}
+        
+        elo_h, elo_a = v_home["elo"], v_away["elo"]
+        elo_diff = (elo_h + 60.0) - elo_a
+        lambda_h = DEFAULT_LAMBDA_HOME * (10.0 ** (elo_diff / 1000.0))
+        lambda_a = DEFAULT_LAMBDA_AWAY * (10.0 ** (-elo_diff / 1000.0))
+        
+        lambda_h = apply_fatigue_and_rest(lambda_h, f.rest_days_home, f.rest_days_away)
+        lambda_a = apply_fatigue_and_rest(lambda_a, f.rest_days_away, f.rest_days_home)
+        lambda_h = apply_vaep_injury_adjustment(lambda_h, f.vaep_delta_home)
+        lambda_a = apply_vaep_injury_adjustment(lambda_a, f.vaep_delta_away)
+        
+        has_odds = (f.odds_home and f.odds_draw and f.odds_away and f.odds_home > 1.05)
+        fair_market, margin, z_shin = de_vig_odds_shin(f.odds_home, f.odds_draw, f.odds_away) if has_odds else (None, 0.05, 0.02)
+        dc = calculate_dixon_coles_grid(lambda_h, lambda_a, rho=DEFAULT_RHO)
+        
+        if fair_market:
+            p_home = (dc["p_home"] * 0.35) + (fair_market["1"] * 0.65)
+            p_draw = (dc["p_draw"] * 0.35) + (fair_market["X"] * 0.65)
+            p_away = (dc["p_away"] * 0.35) + (fair_market["2"] * 0.65)
+            tot = p_home + p_draw + p_away
+            p_home /= tot; p_draw /= tot; p_away /= tot
         else:
-            primary_pick, pick_odds, primary_prob = (f"{f.home} or Draw (1X)", 1.38, p_1x) if p_1x >= p_x2 else (f"{f.away} or Draw (X2)", 1.40, p_x2)
-    return {
-        "id": f.id or f"{f.home}-{f.away}", "home": f.home, "away": f.away, "league": f.league or "Universal",
-        "verified": True, "verification": {"home": v_home, "away": v_away},
-        "elo_home": elo_h, "elo_away": elo_a, "elo_gap": round(elo_diff - 60.0, 1),
-        "lambda_home": round(lambda_h, 2), "lambda_away": round(lambda_a, 2),
-        "p_home": round(p_home, 3), "p_draw": round(p_draw, 3), "p_away": round(p_away, 3),
-        "p_1X": round(p_home + p_draw, 3), "p_X2": round(p_away + p_draw, 3),
-        "p_over15": round(dc["p_over15"], 3), "p_over25": round(dc["p_over25"], 3), "p_btts": round(dc["p_btts"], 3),
-        "fair_odds_home": fair_odds_h, "fair_odds_draw": fair_odds_d, "fair_odds_away": fair_odds_a,
-        "pick_1x2": val_1x2["pick_1x2"], "pick_1x2_name": val_1x2["pick_1x2_name"],
-        "pick_1x2_odds": val_1x2["pick_1x2_odds"], "pick_1x2_ev": val_1x2["pick_1x2_ev"],
-        "value_category": val_1x2["value_category"], "is_high_odds_1x2": val_1x2["is_high_odds_1x2"],
-        "high_odds_reason": val_1x2["high_odds_reason"],
-        "primary_pick": primary_pick, "pick_odds": pick_odds, "primary_win_prob": primary_prob,
-        "confidence_tier": tier, "adj_edge": round(max(0.0, (primary_prob * pick_odds) - 1.0), 3),
-        "acca_eligible": primary_prob >= 0.58,
-        "reason": f"DC xG: {lambda_h:.2f} vs {lambda_a:.2f}. Rest: {f.rest_days_home}d vs {f.rest_days_away}d. VAEP: {f.vaep_delta_home} / {f.vaep_delta_away}."
-    }
+            p_home, p_draw, p_away = dc["p_home"], dc["p_draw"], dc["p_away"]
+        
+        fair_odds_h = round(1.0 / max(0.01, p_home), 2)
+        fair_odds_d = round(1.0 / max(0.01, p_draw), 2)
+        fair_odds_a = round(1.0 / max(0.01, p_away), 2)
+        
+        val_1x2 = evaluate_1x2_value(p_home, p_draw, p_away, fair_odds_h, fair_odds_d, fair_odds_a, f.odds_home, f.odds_draw, f.odds_away, lambda_h + lambda_a, f.home, f.away)
+        
+        primary_pick, pick_odds, primary_prob, tier = "NO BET", 1.35, 0.0, "CANDIDATE"
+        if p_home >= 0.64:
+            primary_pick, pick_odds, primary_prob = f"{f.home} (1)", f.odds_home or fair_odds_h, p_home
+            tier = "ELITE" if p_home >= 0.72 else "STRONG"
+        elif p_away >= 0.60:
+            primary_pick, pick_odds, primary_prob = f"{f.away} (2)", f.odds_away or fair_odds_a, p_away
+            tier = "ELITE" if p_away >= 0.68 else "STRONG"
+        else:
+            p_1x, p_x2 = p_home + p_draw, p_away + p_draw
+            if p_1x >= 0.72 and p_home >= p_away:
+                primary_pick, pick_odds, primary_prob = f"{f.home} or Draw (1X)", max(1.20, min(1.80, round(1.0/p_1x, 2))), p_1x
+                tier = "STRONG" if p_1x >= 0.78 else "CANDIDATE"
+            elif p_x2 >= 0.70 and p_away >= p_home:
+                primary_pick, pick_odds, primary_prob = f"{f.away} or Draw (X2)", max(1.20, min(1.80, round(1.0/p_x2, 2))), p_x2
+                tier = "STRONG" if p_x2 >= 0.76 else "CANDIDATE"
+            else:
+                primary_pick, pick_odds, primary_prob = (f"{f.home} or Draw (1X)", 1.38, p_1x) if p_1x >= p_x2 else (f"{f.away} or Draw (X2)", 1.40, p_x2)
 
-# ─── AGENT 7: ACCA BUILDER ─────────────────────────────────────────────────
+        return {
+            "id": f.id or f"{f.home}-{f.away}", "home": f.home, "away": f.away, "league": f.league or "Universal",
+            "verified": True, "verification": {"home": v_home, "away": v_away},
+            "elo_home": elo_h, "elo_away": elo_a, "elo_gap": round(elo_diff - 60.0, 1),
+            "lambda_home": round(lambda_h, 2), "lambda_away": round(lambda_a, 2),
+            "p_home": round(p_home, 3), "p_draw": round(p_draw, 3), "p_away": round(p_away, 3),
+            "p_1X": round(p_home + p_draw, 3), "p_X2": round(p_away + p_draw, 3),
+            "p_over15": round(dc["p_over15"], 3), "p_over25": round(dc["p_over25"], 3), "p_btts": round(dc["p_btts"], 3),
+            "fair_odds_home": fair_odds_h, "fair_odds_draw": fair_odds_d, "fair_odds_away": fair_odds_a,
+            "pick_1x2": val_1x2["pick_1x2"], "pick_1x2_name": val_1x2["pick_1x2_name"],
+            "pick_1x2_odds": val_1x2["pick_1x2_odds"], "pick_1x2_ev": val_1x2["pick_1x2_ev"],
+            "value_category": val_1x2["value_category"], "is_high_odds_1x2": val_1x2["is_high_odds_1x2"],
+            "high_odds_reason": val_1x2["high_odds_reason"],
+            "primary_pick": primary_pick, "pick_odds": pick_odds, "primary_win_prob": primary_prob,
+            "confidence_tier": tier, "adj_edge": round(max(0.0, (primary_prob * pick_odds) - 1.0), 3),
+            "acca_eligible": primary_prob >= 0.58,
+            "reason": f"DC xG: {lambda_h:.2f} vs {lambda_a:.2f}. Rest: {f.rest_days_home}d vs {f.rest_days_away}d. VAEP: {f.vaep_delta_home} / {f.vaep_delta_away}."
+        }
+    except Exception as e:
+        return {
+            "id": f.id or f"{f.home}-{f.away}", "home": f.home, "away": f.away,
+            "verified": False, "verification": {"home": {"source": "error"}, "away": {"source": "error"}},
+            "reject_reason": f"Processing error: {str(e)[:100]}",
+            "primary_pick": "NO BET", "confidence_tier": "REJECTED", "acca_eligible": False
+        }
+
 def build_accumulators(predictions: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
     actionable = [p for p in predictions if p.get("verified") and p.get("acca_eligible")]
     sorted_cands = sorted(actionable, key=lambda x: x.get("primary_win_prob", 0.0), reverse=True)
@@ -351,32 +294,23 @@ def build_accumulators(predictions: List[Dict[str, Any]]) -> List[Dict[str, Any]
         return {"name": f"{name} (≥{target_min_odds:.2f} Odds)", "combined_odds": round(comb_odds, 2),
                 "combined_model_prob": round(comb_prob * 100, 1), "expected_value": round(ev * 100, 1),
                 "fractional_kelly_stake_pct": round(kelly_stake * 100, 2), "n_legs": len(legs),
-                "legs": [{"home": l["home"], "away": l["away"], "pick": l["primary_pick"],
-                          "odds": l["pick_odds"], "prob": l["primary_win_prob"]} for l in legs]}
+                "legs": [{"home": l["home"], "away": l["away"], "pick": l["primary_pick"], "odds": l["pick_odds"], "prob": l["primary_win_prob"]} for l in legs]}
     accas = []
     for name, target, max_l in [("Banker Multiplier", 3.00, 4), ("Solid Growth", 6.00, 5), ("Power Acca", 10.00, 6)]:
         a = create_acca(name, target, max_l)
         if a: accas.append(a)
     return accas
 
-# ─── ⭐⭐⭐ ENDPOINTS ⭐⭐⭐ ────────────────────────────────────────────────────
-
-# ⭐ THIS IS THE KEY ENDPOINT - IT SERVES YOUR HTML DASHBOARD ⭐
 @app.get("/")
 def serve_frontend():
-    """Serve the index.html file directly from Render."""
     html_path = Path(__file__).parent / "index.html"
     if html_path.exists():
         return FileResponse(html_path, media_type="text/html")
-    return JSONResponse({
-        "engine": "FIONAH ENGINE v1.0",
-        "status": "online",
-        "message": "Backend is live but index.html is missing. Add it to the backend/ folder to see the dashboard."
-    })
+    return JSONResponse({"engine": "FIONAH ENGINE v1.2", "status": "online", "message": "Backend is live but index.html is missing."})
 
 @app.get("/api/health")
 def health():
-    return {"status": "ok", "version": "1.0.0", "timestamp": dt.datetime.utcnow().isoformat()}
+    return {"status": "ok", "version": "1.2.0", "timestamp": dt.datetime.utcnow().isoformat()}
 
 @app.post("/api/predict")
 def predict_endpoint(fixture: FixtureInput):
@@ -392,7 +326,7 @@ def batch_predict(req: BatchPredictionRequest):
         verified = [p for p in predictions if p.get("verified")]
         unverified = [p for p in predictions if not p.get("verified")]
         return {
-            "engine": "FIONAH-v1.0", "count": len(predictions),
+            "engine": "FIONAH-v1.2", "count": len(predictions),
             "verified_count": len(verified), "rejected_count": len(unverified),
             "predictions": verified, "unverified_fixtures": unverified,
             "accumulators": build_accumulators(predictions),
