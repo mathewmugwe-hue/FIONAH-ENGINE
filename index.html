@@ -5,48 +5,89 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
 <title>FIONAH ENGINE v1.0</title>
 <style>
-  :root{--bg:#070b1a;--panel:#121a33;--panel2:#0f1730;--line:#1f2a4a;--text:#e6ecff;--muted:#8a95b8;--accent:#5b8cff;--good:#2ecc71;--warn:#f39c12;--bad:#e74c3c;--chip:#1a2447}
-  *{box-sizing:border-box}
-  body{margin:0;font-family:ui-sans-serif,system-ui,sans-serif;background:linear-gradient(180deg,#070b1a,#0b1020);color:var(--text);min-height:100vh}
-  header{padding:18px 22px;border-bottom:1px solid var(--line);display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:12px}
-  header h1{margin:0;font-size:20px}
-  .pill{display:inline-flex;align-items:center;gap:6px;padding:4px 10px;border-radius:999px;background:var(--chip);font-size:12px;border:1px solid var(--line)}
-  .pill .dot{width:8px;height:8px;border-radius:50%;background:var(--good);box-shadow:0 0 8px var(--good)}
-  .pill.warn .dot{background:var(--warn);box-shadow:0 0 8px var(--warn)}
-  main{padding:22px;max-width:1280px;margin:0 auto;display:grid;gap:18px}
-  .grid2{display:grid;grid-template-columns:1fr 1fr;gap:18px}
-  .grid4{display:grid;grid-template-columns:repeat(4,1fr);gap:12px}
-  @media(max-width:900px){.grid2,.grid4{grid-template-columns:1fr}}
-  .card{background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:16px}
-  .card h2{margin:0 0 10px 0;font-size:15px}
-  .card h3{margin:14px 0 8px 0;font-size:12px;color:var(--muted);text-transform:uppercase;letter-spacing:.6px}
-  textarea,input,select{width:100%;background:var(--panel2);color:var(--text);border:1px solid var(--line);border-radius:10px;padding:10px 12px;font-size:13px;font-family:inherit}
-  textarea{min-height:160px;resize:vertical}
-  button{cursor:pointer;border:0;border-radius:10px;padding:10px 14px;font-weight:600;background:var(--accent);color:#fff;font-size:13px}
-  button.ghost{background:transparent;border:1px solid var(--line);color:var(--text)}
-  button:disabled{opacity:.5;cursor:not-allowed}
-  .row{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
-  .stat{display:flex;gap:12px;flex-wrap:wrap;margin-top:10px}
-  .stat .item{background:var(--panel2);border:1px solid var(--line);padding:8px 12px;border-radius:10px;font-size:12px}
-  .stat .item b{color:var(--accent);display:block;font-size:16px}
-  table{width:100%;border-collapse:collapse;font-size:12.5px}
-  th,td{padding:8px 10px;text-align:left;border-bottom:1px solid var(--line);vertical-align:top}
-  th{color:var(--muted);font-weight:600;text-transform:uppercase;font-size:11px;letter-spacing:.5px}
-  tr.rejected{opacity:.6}
-  .badge{display:inline-block;padding:2px 8px;border-radius:999px;font-size:11px;font-weight:600}
-  .badge.elite{background:rgba(46,204,113,.15);color:var(--good);border:1px solid rgba(46,204,113,.4)}
-  .badge.strong{background:rgba(91,140,255,.15);color:var(--accent);border:1px solid rgba(91,140,255,.4)}
-  .badge.candidate{background:rgba(243,156,18,.15);color:var(--warn);border:1px solid rgba(243,156,18,.4)}
-  .badge.rejected{background:rgba(231,76,60,.15);color:var(--bad);border:1px solid rgba(231,76,60,.4)}
-  .badge.verified{background:rgba(46,204,113,.15);color:var(--good)}
-  .badge.unverified{background:rgba(231,76,60,.15);color:var(--bad)}
-  .acca{background:var(--panel2);border:1px solid var(--line);border-radius:10px;padding:12px;margin-bottom:10px}
-  .acca .head{display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;flex-wrap:wrap;gap:8px}
-  .acca .head b{color:var(--accent)}
-  .acca .leg{font-size:12px;color:var(--muted);padding:4px 0;border-top:1px dashed var(--line)}
-  .empty{color:var(--muted);font-size:13px;padding:14px;text-align:center}
-  .footer{color:var(--muted);font-size:11px;text-align:center;padding:18px}
-  pre{background:#05081a;border:1px solid var(--line);border-radius:8px;padding:10px;font-size:11.5px;overflow:auto;max-height:260px}
+  :root {
+    --bg: #070b1a; --panel: #121a33; --panel2: #0f1730; --line: #1f2a4a;
+    --text: #e6ecff; --muted: #8a95b8; --accent: #5b8cff; --good: #2ecc71;
+    --warn: #f39c12; --bad: #e74c3c; --chip: #1a2447;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; font-family: ui-sans-serif, system-ui, -apple-system, sans-serif;
+    background: linear-gradient(180deg, #070b1a, #0b1020); color: var(--text);
+    min-height: 100vh; line-height: 1.5;
+  }
+  header {
+    padding: 18px 22px; border-bottom: 1px solid var(--line);
+    display: flex; align-items: center; justify-content: space-between;
+    flex-wrap: wrap; gap: 12px;
+  }
+  header h1 { margin: 0; font-size: 20px; letter-spacing: 0.3px; }
+  header .sub { color: var(--muted); font-size: 12px; margin-top: 4px; }
+  .pill {
+    display: inline-flex; align-items: center; gap: 6px; padding: 4px 10px;
+    border-radius: 999px; background: var(--chip); font-size: 12px; border: 1px solid var(--line);
+  }
+  .pill .dot { width: 8px; height: 8px; border-radius: 50%; background: var(--good); box-shadow: 0 0 8px var(--good); }
+  .pill.warn .dot { background: var(--warn); box-shadow: 0 0 8px var(--warn); }
+  .pill.offline .dot { background: var(--bad); box-shadow: 0 0 8px var(--bad); }
+  
+  main { padding: 22px; max-width: 1280px; margin: 0 auto; display: grid; gap: 18px; }
+  .grid2 { display: grid; grid-template-columns: 1fr 1fr; gap: 18px; }
+  .grid4 { display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; }
+  @media (max-width: 900px) { .grid2, .grid4 { grid-template-columns: 1fr; } }
+  
+  .card { background: var(--panel); border: 1px solid var(--line); border-radius: 14px; padding: 16px; }
+  .card h2 { margin: 0 0 10px 0; font-size: 15px; letter-spacing: 0.3px; }
+  .card h3 { margin: 14px 0 8px 0; font-size: 12px; color: var(--muted); text-transform: uppercase; letter-spacing: 0.6px; }
+  
+  textarea, input, select {
+    width: 100%; background: var(--panel2); color: var(--text);
+    border: 1px solid var(--line); border-radius: 10px; padding: 10px 12px;
+    font-size: 13px; font-family: inherit; outline: none; transition: border-color 0.2s;
+  }
+  textarea:focus, input:focus { border-color: var(--accent); }
+  textarea { min-height: 160px; resize: vertical; }
+  
+  button {
+    cursor: pointer; border: 0; border-radius: 10px; padding: 10px 14px;
+    font-weight: 600; background: var(--accent); color: #fff; font-size: 13px;
+    transition: opacity 0.2s, transform 0.1s;
+  }
+  button:hover { opacity: 0.9; }
+  button:active { transform: scale(0.98); }
+  button.ghost { background: transparent; border: 1px solid var(--line); color: var(--text); }
+  button:disabled { opacity: 0.5; cursor: not-allowed; }
+  
+  .row { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
+  .stat { display: flex; gap: 12px; flex-wrap: wrap; margin-top: 10px; }
+  .stat .item {
+    background: var(--panel2); border: 1px solid var(--line);
+    padding: 8px 12px; border-radius: 10px; font-size: 12px; text-align: center;
+  }
+  .stat .item b { color: var(--accent); display: block; font-size: 16px; margin-bottom: 2px; }
+  
+  table { width: 100%; border-collapse: collapse; font-size: 12.5px; }
+  th, td { padding: 8px 10px; text-align: left; border-bottom: 1px solid var(--line); vertical-align: top; }
+  th { color: var(--muted); font-weight: 600; text-transform: uppercase; font-size: 11px; letter-spacing: 0.5px; }
+  tr.rejected { opacity: 0.6; }
+  
+  .badge { display: inline-block; padding: 2px 8px; border-radius: 999px; font-size: 11px; font-weight: 600; }
+  .badge.elite { background: rgba(46,204,113,0.15); color: var(--good); border: 1px solid rgba(46,204,113,0.4); }
+  .badge.strong { background: rgba(91,140,255,0.15); color: var(--accent); border: 1px solid rgba(91,140,255,0.4); }
+  .badge.candidate { background: rgba(243,156,18,0.15); color: var(--warn); border: 1px solid rgba(243,156,18,0.4); }
+  .badge.rejected { background: rgba(231,76,60,0.15); color: var(--bad); border: 1px solid rgba(231,76,60,0.4); }
+  .badge.verified { background: rgba(46,204,113,0.15); color: var(--good); }
+  .badge.unverified { background: rgba(231,76,60,0.15); color: var(--bad); }
+  
+  .acca { background: var(--panel2); border: 1px solid var(--line); border-radius: 10px; padding: 12px; margin-bottom: 10px; }
+  .acca .head { display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; flex-wrap: wrap; gap: 8px; }
+  .acca .head b { color: var(--accent); }
+  .acca .leg { font-size: 12px; color: var(--muted); padding: 4px 0; border-top: 1px dashed var(--line); }
+  .acca .leg:first-of-type { border-top: 0; }
+  
+  .empty { color: var(--muted); font-size: 13px; padding: 14px; text-align: center; }
+  .footer { color: var(--muted); font-size: 11px; text-align: center; padding: 18px; border-top: 1px solid var(--line); margin-top: 22px; }
+  pre { background: #05081a; border: 1px solid var(--line); border-radius: 8px; padding: 10px; font-size: 11.5px; overflow: auto; max-height: 260px; }
 </style>
 </head>
 <body>
@@ -54,7 +95,7 @@
 <header>
   <div>
     <h1>⚽ FIONAH ENGINE v1.0</h1>
-    <div style="color:var(--muted);font-size:12px">Football Intelligence & Odds Normalization Heuristic Architecture</div>
+    <div class="sub">Football Intelligence & Odds Normalization Heuristic Architecture</div>
   </div>
   <div class="row">
     <span id="statusPill" class="pill"><span class="dot"></span><span id="statusText">connecting…</span></span>
@@ -62,10 +103,12 @@
 </header>
 
 <main>
+  <!-- BATCH SLATE EVALUATOR -->
   <section class="card">
     <h2>Batch Slate Evaluator · Synchronized Multi-Format Parser</h2>
     <p style="color:var(--muted);font-size:12.5px;margin:4px 0 10px 0">
-      Paste fixtures. The parser strips UI chrome. Every team is run through <b>RapidFuzz Entity Verification</b>. Unverified entities are hard-rejected.
+      Paste fixtures. The parser strips UI chrome (<code>+N Markets</code>, <code>• League</code>, timestamps). 
+      Every team is run through <b>Difflib Entity Verification</b>. Unverified entities are hard-rejected.
     </p>
     <textarea id="rawInput" placeholder="Arsenal vs Chelsea 1.95 3.60 4.20&#10;Real Madrid - Barcelona 2.10 3.40 3.50&#10;+43 Markets&#10;• Premier League, Division 1&#10;Bayern Munich vs Dortmund 1.70 4.00 5.00"></textarea>
     <div class="row" style="margin-top:10px">
@@ -76,15 +119,18 @@
     <div class="stat" id="parseStats"></div>
   </section>
 
+  <!-- SINGLE MATCH DEEP AUDIT -->
   <section class="card">
     <h2>Single Match Deep Audit (with Agent 2 & 3 Inputs)</h2>
     <div class="grid2">
       <div><label style="font-size:12px;color:var(--muted)">Home Team</label><input id="singleHome" placeholder="e.g. Arsenal"/></div>
       <div><label style="font-size:12px;color:var(--muted)">Away Team</label><input id="singleAway" placeholder="e.g. Chelsea"/></div>
       <div><label style="font-size:12px;color:var(--muted)">Odds 1 / X / 2</label>
-        <div class="row"><input id="singleO1" type="number" step="0.01" placeholder="1.95" style="flex:1"/>
-        <input id="singleOX" type="number" step="0.01" placeholder="3.60" style="flex:1"/>
-        <input id="singleO2" type="number" step="0.01" placeholder="4.20" style="flex:1"/></div>
+        <div class="row">
+          <input id="singleO1" type="number" step="0.01" placeholder="1.95" style="flex:1"/>
+          <input id="singleOX" type="number" step="0.01" placeholder="3.60" style="flex:1"/>
+          <input id="singleO2" type="number" step="0.01" placeholder="4.20" style="flex:1"/>
+        </div>
       </div>
       <div><label style="font-size:12px;color:var(--muted)">League</label><input id="singleLeague" placeholder="Premier League"/></div>
     </div>
@@ -101,35 +147,47 @@
     <div id="singleResult" style="margin-top:12px"></div>
   </section>
 
+  <!-- UNVERIFIED FIXTURES -->
   <section class="card" id="unverifiedCard" style="display:none">
     <h2>⚠️ Unverified Fixtures (Hard-Rejected by Entity Gatekeeper)</h2>
-    <p style="color:var(--muted);font-size:12.5px">These entries failed RapidFuzz canonical matching. Never silently faked.</p>
+    <p style="color:var(--muted);font-size:12.5px">These entries failed canonical matching. Never silently faked.</p>
     <div id="unverifiedList"></div>
   </section>
 
+  <!-- ACCUMULATORS -->
   <section class="card">
     <h2>Recommended Accumulators (Orthogonal Disjoint Sets · Fractional Kelly)</h2>
     <div id="accaList"><div class="empty">No accumulators yet. Run a batch evaluation.</div></div>
   </section>
 
+  <!-- EVALUATED MATCHES -->
   <section class="card">
     <h2>Evaluated Matches (Verified)</h2>
     <div id="evalList"><div class="empty">No evaluated matches yet.</div></div>
   </section>
 
+  <!-- BACKEND STATUS -->
   <section class="card">
     <h2>Real-Time Backend Status</h2>
     <div id="backendStatus"><div class="empty">Loading…</div></div>
   </section>
 </main>
 
-<div class="footer">FIONAH ENGINE v1.0 · Zero LLM Math · No Hardcoded Multipliers · Disjoint Acca Guardrails</div>
+<div class="footer">
+  FIONAH ENGINE v1.0 · Zero LLM Math · No Hardcoded Multipliers · Disjoint Acca Guardrails
+</div>
 
 <script>
-// ⚠️ IMPORTANT: Replace this with your Render backend URL after deployment!
-// Example: "https://fionah-engine-backend.onrender.com"
-const API_BASE = (location.hostname === "localhost" || location.hostname === "127.0.0.1") ? "http://localhost:8000" : "https://YOUR-RENDER-URL.onrender.com";
+/* ═══════════════════════════════════════════════════════════════════════════
+   CONFIGURATION
+   ═══════════════════════════════════════════════════════════════════════════ */
+// ⚠️ IMPORTANT: This is pre-configured to your live Render backend. 
+// If your Render URL changes, update it here.
+const API_BASE = "https://fionah-engine-5.onrender.com";
 
+/* ═══════════════════════════════════════════════════════════════════════════
+   SYNCHRONIZED MULTI-FORMAT PARSER
+   ═══════════════════════════════════════════════════════════════════════════ */
 const UI_CHROME = [
   /^\s*\+?\s*\d+\s*(markets|more|events|games|bets|selections|legs)/i,
   /^\s*[•\-\*]\s+.*(?:liga|league|division|serie|cup|conference|tier|group|stage|round)/i,
@@ -146,8 +204,8 @@ const VS_RE = /\s+(?:vs\.?|v\.?|vs\s|-\s|—\s|–\s|\s-\s|\svs\s)\s*/i;
 function isValidTeamName(s) {
   if (!s || s.trim().length < 2) return false;
   s = s.trim();
-  if (/^\d+\.?\d*$/.test(s)) return false;
-  if (!/[a-zA-Z]/.test(s)) return false;
+  if (/^\d+\.?\d*$/.test(s)) return false; // Pure number
+  if (!/[a-zA-Z]/.test(s)) return false;   // Must contain letters
   if (/^(draw|home|away|yes|no|over|under)$/i.test(s)) return false;
   for (const p of UI_CHROME) if (p.test(s)) return false;
   return true;
@@ -164,6 +222,7 @@ function parseRawBatchInput(raw) {
     if (!oddsMatch) { rejected.push({ line: trimmed, reason: "no 3-odds pattern" }); continue; }
     const beforeOdds = trimmed.substring(0, oddsMatch.index).trim();
     if (!beforeOdds) { rejected.push({ line: trimmed, reason: "no team names" }); continue; }
+    
     const parts = beforeOdds.split(VS_RE).map(s => s.trim()).filter(Boolean);
     let home, away;
     if (parts.length >= 2) { home = parts[0]; away = parts[parts.length - 1]; }
@@ -176,16 +235,27 @@ function parseRawBatchInput(raw) {
       rejected.push({ line: trimmed, reason: `invalid team name (home='${home}', away='${away}')` });
       continue;
     }
-    fixtures.push({ home, away, odds_home: parseFloat(oddsMatch[1]), odds_draw: parseFloat(oddsMatch[2]), odds_away: parseFloat(oddsMatch[3]) });
+    fixtures.push({ 
+      home, away, 
+      odds_home: parseFloat(oddsMatch[1]), 
+      odds_draw: parseFloat(oddsMatch[2]), 
+      odds_away: parseFloat(oddsMatch[3]) 
+    });
   }
   return { fixtures, rejected };
 }
 
+/* ═══════════════════════════════════════════════════════════════════════════
+   UI HELPERS
+   ═══════════════════════════════════════════════════════════════════════════ */
 const $ = id => document.getElementById(id);
-const API_BASE = "https://fionah-engine-5.onrend
+function escapeHtml(s) { return String(s||"").replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c])); }
 function tierBadge(t) { const c=["elite","strong","candidate","rejected"].includes(t?.toLowerCase())?t.toLowerCase():"candidate"; return `<span class="badge ${c}">${t||"CANDIDATE"}</span>`; }
 function verifiedBadge(v) { return v ? `<span class="badge verified">✓ verified</span>` : `<span class="badge unverified">✗ unverified</span>`; }
 
+/* ═══════════════════════════════════════════════════════════════════════════
+   ACTIONS
+   ═══════════════════════════════════════════════════════════════════════════ */
 $("btnClear").addEventListener("click", () => {
   $("rawInput").value = ""; $("parseStats").innerHTML = "";
   $("evalList").innerHTML = `<div class="empty">No evaluated matches yet.</div>`;
@@ -200,11 +270,22 @@ $("btnPreset").addEventListener("click", () => {
 $("btnRun").addEventListener("click", async () => {
   const raw = $("rawInput").value;
   if (!raw.trim()) { alert("Paste fixtures first."); return; }
+  
   const { fixtures, rejected } = parseRawBatchInput(raw);
-  $("parseStats").innerHTML = `<div class="item"><b>${fixtures.length}</b>fixtures parsed</div><div class="item"><b style="color:var(--bad)">${rejected.length}</b>UI chrome rejected</div><div class="item"><b>✓</b>RapidFuzz enforced</div>`;
-  if (!fixtures.length) { $("evalList").innerHTML = `<div class="empty">No valid fixtures after parsing.</div>`; return; }
+  $("parseStats").innerHTML = `
+    <div class="item"><b>${fixtures.length}</b>fixtures parsed</div>
+    <div class="item"><b style="color:var(--bad)">${rejected.length}</b>UI chrome rejected</div>
+    <div class="item"><b>✓</b>Difflib enforced</div>
+  `;
+  
+  if (!fixtures.length) { 
+    $("evalList").innerHTML = `<div class="empty">No valid fixtures after parsing.</div>`; 
+    return; 
+  }
   
   $("evalList").innerHTML = `<div class="empty">Running quantitative evaluation + entity verification…</div>`;
+  $("btnRun").disabled = true;
+  
   try {
     const res = await fetch(`${API_BASE}/api/batch-predict`, {
       method: "POST", headers: { "Content-Type": "application/json" },
@@ -213,40 +294,59 @@ $("btnRun").addEventListener("click", async () => {
     if (!res.ok) throw new Error("HTTP " + res.status);
     const data = await res.json();
     
+    // 1. Render Evaluated
     let html = `<table><thead><tr><th>Fixture</th><th>Verified</th><th>Pick</th><th>Prob</th><th>Odds</th><th>EV</th><th>xG</th><th>Rest/VAEP</th><th>Tier</th></tr></thead><tbody>`;
-    for (const p of (data.predictions||[])) {
-      html += `<tr><td><b>${escapeHtml(p.home)}</b> vs <b>${escapeHtml(p.away)}</b><div style="color:var(--muted);font-size:11px">${escapeHtml(p.league)}</div></td>
-      <td>${verifiedBadge(p.verified)}</td><td>${escapeHtml(p.primary_pick)}</td><td>${((p.primary_win_prob||0)*100).toFixed(1)}%</td>
-      <td>${(p.pick_odds||0).toFixed(2)}</td><td>${((p.adj_edge||0)*100).toFixed(1)}%</td>
-      <td>${(p.lambda_home||0).toFixed(2)} – ${(p.lambda_away||0).toFixed(2)}</td>
-      <td style="font-size:11px;color:var(--muted)">${p.reason||""}</td><td>${tierBadge(p.confidence_tier)}</td></tr>`;
+    for (const p of (data.predictions || [])) {
+      html += `<tr>
+        <td><b>${escapeHtml(p.home)}</b> vs <b>${escapeHtml(p.away)}</b><div style="color:var(--muted);font-size:11px">${escapeHtml(p.league)}</div></td>
+        <td>${verifiedBadge(p.verified)}</td>
+        <td>${escapeHtml(p.primary_pick)}</td>
+        <td>${((p.primary_win_prob||0)*100).toFixed(1)}%</td>
+        <td>${(p.pick_odds||0).toFixed(2)}</td>
+        <td>${((p.adj_edge||0)*100).toFixed(1)}%</td>
+        <td>${(p.lambda_home||0).toFixed(2)} – ${(p.lambda_away||0).toFixed(2)}</td>
+        <td style="font-size:11px;color:var(--muted)">${p.reason||""}</td>
+        <td>${tierBadge(p.confidence_tier)}</td>
+      </tr>`;
     }
     html += `</tbody></table>`;
     $("evalList").innerHTML = html;
 
-    if ((data.unverified_fixtures||[]).length) {
+    // 2. Render Unverified
+    if ((data.unverified_fixtures || []).length) {
       $("unverifiedCard").style.display = "block";
       let uhtml = `<table><thead><tr><th>Fixture</th><th>Home Status</th><th>Away Status</th><th>Reason</th></tr></thead><tbody>`;
       for (const p of data.unverified_fixtures) {
-        const vh = p.verification?.home||{}, va = p.verification?.away||{};
-        uhtml += `<tr class="rejected"><td><b>${escapeHtml(p.home)}</b> vs <b>${escapeHtml(p.away)}</b></td>
-        <td>${verifiedBadge(vh.verified)} <span style="font-size:11px;color:var(--muted)">${vh.source||""}</span></td>
-        <td>${verifiedBadge(va.verified)} <span style="font-size:11px;color:var(--muted)">${va.source||""}</span></td>
-        <td style="font-size:11.5px;color:var(--muted)">${escapeHtml(p.reject_reason||"")}</td></tr>`;
+        const vh = p.verification?.home || {}, va = p.verification?.away || {};
+        uhtml += `<tr class="rejected">
+          <td><b>${escapeHtml(p.home)}</b> vs <b>${escapeHtml(p.away)}</b></td>
+          <td>${verifiedBadge(vh.verified)} <span style="font-size:11px;color:var(--muted)">${vh.source||""}</span></td>
+          <td>${verifiedBadge(va.verified)} <span style="font-size:11px;color:var(--muted)">${va.source||""}</span></td>
+          <td style="font-size:11.5px;color:var(--muted)">${escapeHtml(p.reject_reason||"")}</td>
+        </tr>`;
       }
       $("unverifiedList").innerHTML = uhtml + `</tbody></table>`;
     } else {
       $("unverifiedCard").style.display = "none";
     }
 
+    // 3. Render Accas
     const accas = data.accumulators || [];
-    if (!accas.length) { $("accaList").innerHTML = `<div class="empty">No qualifying accumulators (need ≥2 verified legs, combined odds ≥3.00, disjoint sets).</div>`; }
-    else {
+    if (!accas.length) { 
+      $("accaList").innerHTML = `<div class="empty">No qualifying accumulators (need ≥2 verified legs, combined odds ≥3.00, disjoint sets).</div>`; 
+    } else {
       let ahtml = "";
       for (const a of accas) {
-        ahtml += `<div class="acca"><div class="head"><b>${escapeHtml(a.name)}</b>
-          <span><span class="badge strong">${a.n_legs} legs</span> <span class="badge elite">@ ${a.combined_odds.toFixed(2)}</span> 
-          <span class="badge candidate">model ${a.combined_model_prob.toFixed(1)}%</span> <span class="badge elite">Kelly ${a.fractional_kelly_stake_pct.toFixed(2)}%</span></span></div>`;
+        ahtml += `<div class="acca">
+          <div class="head">
+            <b>${escapeHtml(a.name)}</b>
+            <span>
+              <span class="badge strong">${a.n_legs} legs</span> 
+              <span class="badge elite">@ ${a.combined_odds.toFixed(2)}</span> 
+              <span class="badge candidate">model ${a.combined_model_prob.toFixed(1)}%</span> 
+              <span class="badge elite">Kelly ${a.fractional_kelly_stake_pct.toFixed(2)}%</span>
+            </span>
+          </div>`;
         for (const l of a.legs) {
           ahtml += `<div class="leg">• <b>${escapeHtml(l.home)}</b> vs <b>${escapeHtml(l.away)}</b> — ${escapeHtml(l.pick)} @ ${l.odds.toFixed(2)} (${(l.prob*100).toFixed(1)}%)</div>`;
         }
@@ -256,12 +356,15 @@ $("btnRun").addEventListener("click", async () => {
     }
   } catch (e) {
     $("evalList").innerHTML = `<div class="empty" style="color:var(--bad)">Backend error: ${escapeHtml(e.message)}. Check API_BASE in index.html.</div>`;
+  } finally {
+    $("btnRun").disabled = false;
   }
 });
 
 $("btnSingle").addEventListener("click", async () => {
   const home = $("singleHome").value.trim(), away = $("singleAway").value.trim();
   if (!home || !away) { alert("Enter home and away teams."); return; }
+  
   const payload = {
     home, away, league: $("singleLeague").value || null,
     odds_home: parseFloat($("singleO1").value) || null,
@@ -272,16 +375,23 @@ $("btnSingle").addEventListener("click", async () => {
     vaep_delta_home: parseFloat($("vaepH").value) || 0.0,
     vaep_delta_away: parseFloat($("vaepA").value) || 0.0,
   };
+  
   $("singleResult").innerHTML = `<div class="empty">Evaluating…</div>`;
+  $("btnSingle").disabled = true;
+  
   try {
-    const res = await fetch(`${API_BASE}/api/predict`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(payload) });
+    const res = await fetch(`${API_BASE}/api/predict`, { 
+      method: "POST", headers: { "Content-Type": "application/json" }, 
+      body: JSON.stringify(payload) 
+    });
     const data = await res.json();
     if (!res.ok) throw new Error(data.detail || "HTTP " + res.status);
     
     if (!data.verified) {
       $("singleResult").innerHTML = `<div style="background:var(--panel2);border:1px solid var(--bad);border-radius:10px;padding:12px">
         <div style="color:var(--bad);font-weight:600">✗ Fixture REJECTED by Entity Gatekeeper</div>
-        <div style="color:var(--muted);font-size:12.5px;margin-top:6px">${escapeHtml(data.reject_reason||"")}</div></div>`;
+        <div style="color:var(--muted);font-size:12.5px;margin-top:6px">${escapeHtml(data.reject_reason||"")}</div>
+      </div>`;
       return;
     }
     
@@ -304,24 +414,30 @@ $("btnSingle").addEventListener("click", async () => {
     </div>`;
   } catch (e) {
     $("singleResult").innerHTML = `<div class="empty" style="color:var(--bad)">Error: ${escapeHtml(e.message)}</div>`;
+  } finally {
+    $("btnSingle").disabled = false;
   }
 });
 
+/* ═══════════════════════════════════════════════════════════════════════════
+   BACKEND STATUS POLLING
+   ═══════════════════════════════════════════════════════════════════════════ */
 async function refreshStatus() {
   try {
     const r = await fetch(`${API_BASE}/api/health`).then(r => r.json());
-    $("statusPill").classList.remove("warn");
-    $("statusText").textContent = `online · v${r.version} · RapidFuzz: ${r.rapidfuzz_enabled?'✓':'✗'}`;
+    $("statusPill").classList.remove("warn", "offline");
+    $("statusText").textContent = `online · v${r.version}`;
     $("backendStatus").innerHTML = `<div class="stat">
       <div class="item"><b>✓</b>No LLM Math</div>
       <div class="item"><b>✓</b>No Hardcoded Multipliers</div>
       <div class="item"><b>✓</b>Disjoint Acca Sets</div>
-      <div class="item"><b>✓</b>RapidFuzz Entity Check</div>
+      <div class="item"><b>✓</b>Difflib Entity Check</div>
       <div class="item"><b>✓</b>No Invented Entities</div>
     </div>`;
   } catch (e) {
-    $("statusPill").classList.add("warn");
-    $("statusText").textContent = "backend offline";
+    $("statusPill").classList.add("offline");
+    $("statusText").textContent = "backend offline (Render may be sleeping)";
+    $("backendStatus").innerHTML = `<div class="empty" style="color:var(--bad)">Cannot reach backend at ${API_BASE}. Check URL or wait for Render to wake up.</div>`;
   }
 }
 refreshStatus();
