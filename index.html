@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-<title>FIONAH ENGINE v1.2</title>
+<title>FIONAH ENGINE v1.3</title>
 <style>
   :root {
     --bg: #070b1a; --panel: #121a33; --panel2: #0f1730; --line: #1f2a4a;
@@ -94,8 +94,8 @@
 
 <header>
   <div>
-    <h1>⚽ FIONAH ENGINE v1.2</h1>
-    <div class="sub">Universal Bookmaker Parser · Zero LLM Math · Difflib Entity Verification</div>
+    <h1>⚽ FIONAH ENGINE v1.3</h1>
+    <div class="sub">Block-Based Parser · Provisional Baseline for Unknown Valid Teams · Zero LLM Math</div>
   </div>
   <div class="row">
     <span id="statusPill" class="pill"><span class="dot"></span><span id="statusText">connecting…</span></span>
@@ -106,9 +106,9 @@
   <section class="card">
     <h2>Batch Slate Evaluator · Universal Multi-Format Parser</h2>
     <p style="color:var(--muted);font-size:12.5px;margin:4px 0 10px 0">
-      Paste directly from <b>SportPesa, Betika, Odibets, Mozzartbet, or 1xBet</b>. The engine uses an "Odds Anchor" strategy to find the 1X2 odds and extract the preceding team names, ignoring all dates, IDs, and market labels.
+      Paste directly from <b>SportPesa, Betika, Odibets, Mozzartbet, or 1xBet</b>. The engine uses a block-based parser to find the Date/ID header, extract the teams, and hunt for the 1X2 odds, ignoring all other markets.
     </p>
-    <textarea id="rawInput" placeholder="Paste your bookmaker data here...&#10;&#10;Example:&#10;22/09/26 - 22:00 | ID: 4508&#10;Arsenal W&#10;HB Koege W&#10;Home&#10;1.07&#10;Draw&#10;11.00&#10;Away&#10;30.00"></textarea>
+    <textarea id="rawInput" placeholder="Paste your bookmaker data here..."></textarea>
     <div class="row" style="margin-top:10px">
       <button id="btnRun">Run Quantitative Evaluation</button>
       <button id="btnPreset" class="ghost">Load Preset</button>
@@ -146,7 +146,7 @@
 
   <section class="card" id="unverifiedCard" style="display:none">
     <h2>⚠️ Unverified Fixtures (Hard-Rejected)</h2>
-    <p style="color:var(--muted);font-size:12.5px">These entries failed canonical matching. Never silently faked.</p>
+    <p style="color:var(--muted);font-size:12.5px">These entries failed canonical matching or were pure UI chrome. Never silently faked.</p>
     <div id="unverifiedList"></div>
   </section>
 
@@ -166,119 +166,90 @@
   </section>
 </main>
 
-<div class="footer">FIONAH ENGINE v1.2 · Zero LLM Math · No Hardcoded Multipliers · Disjoint Acca Guardrails</div>
+<div class="footer">FIONAH ENGINE v1.3 · Zero LLM Math · No Hardcoded Multipliers · Disjoint Acca Guardrails</div>
 
 <script>
-// ⚠️ Pre-configured for your live Render backend.
 const API_BASE = (location.hostname === "localhost" || location.hostname === "127.0.0.1" || location.hostname === "")
   ? "https://fionah-engine-5.onrender.com"
   : "";
 
 /* ═══════════════════════════════════════════════════════════════════════════
-   UNIVERSAL ODDS-ANCHOR PARSER
-   Handles SportPesa, Betika, Odibets, Mozzartbet, 1xBet, etc.
+   BLOCK-BASED UNIVERSAL PARSER
    ═══════════════════════════════════════════════════════════════════════════ */
-
-function isUICrome(line) {
-  const patterns = [
-    /^\d{2}\/\d{2}\/\d{2}\s*-\s*\d{2}:\d{2}\s*\|\s*ID:\s*\d+/i,
-    /^\d{2}\/\d{2}\/\d{2}\s+\d{2}:\d{2}$/i,
-    /^(1X2|Double Chance|Over\/Under|Draw no bet|Home|Draw|Away|OVER|UNDER|Home Win|Away Win|Boosted Odds|x-up|Total|Goals|Handicap|Asian|Corner|Cards)$/i,
-    /^\+?\s*\d+\s*(markets|more|events|games|bets|selections|legs)/i,
-    /^[•\-\*]\s+.*(?:liga|league|division|serie|cup|conference|tier)/i,
-    /^(live|in[-\s]?play|prematch|cash\s*out|edit\s*bet|my\s*bets|bet\s*slip|payout|stake)/i,
-    /^(popular|featured|top\s*picks|trending|hot|suggested)/i,
-    /^\s*\d{1,2}:\d{2}\s*(am|pm|gmt|utc)?\s*$/i,
-    /^\s*(mon|tue|wed|thu|fri|sat|sun)\w*\s+\d{1,2}\s+\w+/i,
-    /^\d+$/ // Pure numbers (match IDs, market counts)
-  ];
-  return patterns.some(p => p.test(line.trim()));
-}
-
-function isValidTeamName(s) {
-  if (!s || s.trim().length < 3) return false;
-  s = s.trim();
-  if (/^\d+\.?\d*$/.test(s)) return false; 
-  if (!/[a-zA-Z]/.test(s)) return false;   
-  const lower = s.toLowerCase();
-  if (["draw", "home", "away", "yes", "no", "over", "under", "total", "goals", "handicap", "asian", "corner", "cards", "1x2", "x-up", "boosted"].includes(lower)) return false;
-  return true;
-}
-
 function parseRawBatchInput(raw) {
   const fixtures = [];
   const rejected = [];
-  const lines = raw.split(/\r?\n/).map(l => l.trim()).filter(l => l.length > 0);
   
-  let i = 0;
-  while (i < lines.length) {
-    const line = lines[i];
+  // Split by the date/ID header pattern
+  const blocks = raw.split(/(?=\d{2}\/\d{2}\/\d{2}\s*-\s*\d{2}:\d{2}\s*\|\s*ID:\s*\d+)/);
+  
+  for (const block of blocks) {
+    const lines = block.split(/\r?\n/).map(l => l.trim()).filter(l => l.length > 0);
+    if (lines.length < 5) continue;
     
-    // Skip obvious UI chrome
-    if (isUICrome(line)) {
-      i++;
+    // 1. Extract Teams: First 2 valid lines after the header
+    let teamLines = [];
+    for (let i = 1; i < lines.length; i++) {
+      const line = lines[i];
+      if (/^\d+$/.test(line)) continue; // Skip pure numbers
+      if (/^(1X2|x-up|Boosted Odds|Double Chance|Over\/Under|Draw no bet|Total|Goals|Handicap|Asian|Corner|Cards)$/i.test(line)) continue;
+      if (/^(home|draw|away|over|under|1 or x|x or 2|1 or 2)$/i.test(line)) continue;
+      
+      teamLines.push(line);
+      if (teamLines.length === 2) break;
+    }
+    
+    if (teamLines.length < 2) {
+      rejected.push({ line: lines[0], reason: "Could not identify two team names in block" });
       continue;
     }
     
-    // 1. Look ahead for 3 decimal odds (the "Anchor")
-    let oddsFound = [];
-    let oddsIndices = [];
-    let lookAhead = Math.min(i + 15, lines.length);
+    const homeTeam = teamLines[0];
+    const awayTeam = teamLines[1];
     
-    for (let j = i; j < lookAhead; j++) {
-      const match = lines[j].match(/^(\d{1,2}\.\d{2})$/);
-      if (match) {
-        const val = parseFloat(match[1]);
-        if (val >= 1.01 && val <= 99.99) {
-          oddsFound.push(val);
-          oddsIndices.push(j);
-          if (oddsFound.length === 3) break;
-        }
-      }
-    }
+    // 2. Extract 1X2 Odds
+    let odds = [];
+    let in1X2Section = false;
     
-    if (oddsFound.length === 3) {
-      // 2. Extract team names from the lines between current position and the first odd
-      const teamBlock = lines.slice(i, oddsIndices[0]).map(l => l.trim()).filter(l => l.length > 0);
-      const validTeamsInBlock = teamBlock.filter(l => isValidTeamName(l));
-      
-      if (validTeamsInBlock.length >= 2) {
-        const away = validTeamsInBlock[validTeamsInBlock.length - 1];
-        const home = validTeamsInBlock[validTeamsInBlock.length - 2];
-        
-        if (isValidTeamName(home) && isValidTeamName(away)) {
-          fixtures.push({
-            home: home,
-            away: away,
-            odds_home: oddsFound[0],
-            odds_draw: oddsFound[1],
-            odds_away: oddsFound[2]
-          });
-          // Advance pointer past the odds we just consumed
-          i = oddsIndices[2] + 1;
-          continue;
-        }
-      }
-    }
-    
-    // 3. Fallback: Single-line format "Team A vs Team B 1.95 3.60 4.20"
-    const singleLineMatch = line.match(/(.+?)\s+(?:vs\.?|v\.?|-)\s+(.+?)\s+(\d{1,2}\.\d{2})\s+(\d{1,2}\.\d{2})\s+(\d{1,2}\.\d{2})/i);
-    if (singleLineMatch) {
-      const home = singleLineMatch[1].trim();
-      const away = singleLineMatch[2].trim();
-      if (isValidTeamName(home) && isValidTeamName(away)) {
-        fixtures.push({
-          home: home, away: away,
-          odds_home: parseFloat(singleLineMatch[3]),
-          odds_draw: parseFloat(singleLineMatch[4]),
-          odds_away: parseFloat(singleLineMatch[5])
-        });
-        i++;
+    for (let i = 0; i < lines.length; i++) {
+      const line = lines[i];
+      if (/^1X2$/i.test(line)) {
+        in1X2Section = true;
         continue;
       }
+      
+      if (in1X2Section) {
+        const oddMatch = line.match(/^(\d{1,3}\.\d{2})$/);
+        if (oddMatch) {
+          odds.push(parseFloat(oddMatch[1]));
+          if (odds.length === 3) break;
+        }
+        if (/^(double chance|over\/under|draw no bet|total|goals|handicap|asian|corner|cards)$/i.test(line)) {
+          break;
+        }
+      }
     }
     
-    i++;
+    // Fallback: Find any 3 consecutive decimal numbers
+    if (odds.length < 3) {
+      for (let i = 0; i < lines.length; i++) {
+        const match = lines[i].match(/^(\d{1,3}\.\d{2})$/);
+        if (match && i + 2 < lines.length) {
+          const match2 = lines[i+1].match(/^(\d{1,3}\.\d{2})$/);
+          const match3 = lines[i+2].match(/^(\d{1,3}\.\d{2})$/);
+          if (match2 && match3) {
+            odds = [parseFloat(match[1]), parseFloat(match2[1]), parseFloat(match3[1])];
+            break;
+          }
+        }
+      }
+    }
+    
+    if (odds.length === 3) {
+      fixtures.push({ home: homeTeam, away: awayTeam, odds_home: odds[0], odds_draw: odds[1], odds_away: odds[2] });
+    } else {
+      rejected.push({ line: lines[0], reason: `Found teams (${homeTeam} vs ${awayTeam}) but could not find 3 valid 1X2 odds` });
+    }
   }
   
   return { fixtures, rejected };
@@ -290,7 +261,11 @@ function parseRawBatchInput(raw) {
 const $ = id => document.getElementById(id);
 function escapeHtml(s) { return String(s||"").replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c])); }
 function tierBadge(t) { const c=["elite","strong","candidate","rejected"].includes(t?.toLowerCase())?t.toLowerCase():"candidate"; return `<span class="badge ${c}">${t||"CANDIDATE"}</span>`; }
-function verifiedBadge(v) { return v ? `<span class="badge verified">✓ verified</span>` : `<span class="badge unverified">✗ unverified</span>`; }
+function verifiedBadge(v) { 
+  if (!v) return `<span class="badge unverified">✗ unverified</span>`;
+  if (v.source === "provisional_baseline") return `<span class="badge" style="background:rgba(243,156,18,0.15);color:var(--warn);border:1px solid rgba(243,156,18,0.4)">⚠ provisional</span>`;
+  return `<span class="badge verified">✓ verified</span>`; 
+}
 
 $("btnClear").addEventListener("click", () => {
   $("rawInput").value = ""; $("parseStats").innerHTML = "";
@@ -300,7 +275,7 @@ $("btnClear").addEventListener("click", () => {
 });
 
 $("btnPreset").addEventListener("click", () => {
-  $("rawInput").value = `22/09/26 - 22:00 | ID: 4508\nArsenal W\nHB Koege W\n1X2\nHome\n1.07\nDraw\n11.00\nAway\n30.00\n\n22/09/26 - 22:00 | ID: 2563\nJuventus W\nSL Benfica W\n1X2\nHome\n1.73\nDraw\n3.95\nAway\n4.40`;
+  $("rawInput").value = `22/09/26 - 22:00 | ID: 4508\nArsenal W\nHB Koege W\n25\n1X2\nx-up\n1X2\nHome\n1.07\nDraw\n11.00\nAway\n30.00`;
 });
 
 $("btnRun").addEventListener("click", async () => {
@@ -311,11 +286,11 @@ $("btnRun").addEventListener("click", async () => {
   $("parseStats").innerHTML = `
     <div class="item"><b>${fixtures.length}</b>fixtures parsed</div>
     <div class="item"><b style="color:var(--warn)">${rejected.length}</b>lines skipped (UI chrome)</div>
-    <div class="item"><b>✓</b>Difflib enforced</div>
+    <div class="item"><b>✓</b>Block-based parsing</div>
   `;
   
   if (!fixtures.length) { 
-    $("evalList").innerHTML = `<div class="empty">No valid fixtures parsed. Ensure the text contains 1X2 decimal odds (e.g., 1.95 3.60 4.20).</div>`; 
+    $("evalList").innerHTML = `<div class="empty">No valid fixtures parsed. Ensure the text contains Date/ID headers and 1X2 odds.</div>`; 
     return; 
   }
   
@@ -335,7 +310,7 @@ $("btnRun").addEventListener("click", async () => {
     for (const p of (data.predictions || [])) {
       html += `<tr>
         <td><b>${escapeHtml(p.home)}</b> vs <b>${escapeHtml(p.away)}</b><div style="color:var(--muted);font-size:11px">${escapeHtml(p.league)}</div></td>
-        <td>${verifiedBadge(p.verified)}</td>
+        <td>${verifiedBadge(p.verification?.home)}<br>${verifiedBadge(p.verification?.away)}</td>
         <td>${escapeHtml(p.primary_pick)}</td>
         <td>${((p.primary_win_prob||0)*100).toFixed(1)}%</td>
         <td>${(p.pick_odds||0).toFixed(2)}</td>
@@ -355,8 +330,8 @@ $("btnRun").addEventListener("click", async () => {
         const vh = p.verification?.home || {}, va = p.verification?.away || {};
         uhtml += `<tr class="rejected">
           <td><b>${escapeHtml(p.home)}</b> vs <b>${escapeHtml(p.away)}</b></td>
-          <td>${verifiedBadge(vh.verified)} <span style="font-size:11px;color:var(--muted)">${vh.source||""}</span></td>
-          <td>${verifiedBadge(va.verified)} <span style="font-size:11px;color:var(--muted)">${va.source||""}</span></td>
+          <td>${verifiedBadge(vh)} <span style="font-size:11px;color:var(--muted)">${vh.source||""}</span></td>
+          <td>${verifiedBadge(va)} <span style="font-size:11px;color:var(--muted)">${va.source||""}</span></td>
           <td style="font-size:11.5px;color:var(--muted)">${escapeHtml(p.reject_reason||"")}</td>
         </tr>`;
       }
@@ -433,7 +408,7 @@ $("btnSingle").addEventListener("click", async () => {
     $("singleResult").innerHTML = `<div style="background:var(--panel2);border:1px solid var(--line);border-radius:10px;padding:12px;font-size:12.5px">
       <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px">
         <div><b>${escapeHtml(data.home)}</b> vs <b>${escapeHtml(data.away)}</b><div style="color:var(--muted);font-size:11px">${escapeHtml(data.league)}</div></div>
-        <div>${verifiedBadge(true)} ${tierBadge(data.confidence_tier)}</div>
+        <div>${verifiedBadge(data.verification?.home)} ${verifiedBadge(data.verification?.away)} ${tierBadge(data.confidence_tier)}</div>
       </div>
       <div style="display:grid;grid-template-columns:140px 1fr;gap:4px 12px;margin:6px 0">
         <b style="color:var(--muted)">Recommended</b><span>${escapeHtml(data.primary_pick)} @ ${(data.pick_odds||0).toFixed(2)} · ${(data.primary_win_prob*100).toFixed(1)}%</span>
