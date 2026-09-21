@@ -182,7 +182,7 @@ function parseRawBatchInput(raw) {
 }
 
 const $ = id => document.getElementById(id);
-function escapeHtml(s) { return String(s||"").replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c])); }
+const API_BASE = "https://fionah-engine-5.onrend
 function tierBadge(t) { const c=["elite","strong","candidate","rejected"].includes(t?.toLowerCase())?t.toLowerCase():"candidate"; return `<span class="badge ${c}">${t||"CANDIDATE"}</span>`; }
 function verifiedBadge(v) { return v ? `<span class="badge verified">✓ verified</span>` : `<span class="badge unverified">✗ unverified</span>`; }
 
