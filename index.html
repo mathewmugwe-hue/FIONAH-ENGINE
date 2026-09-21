@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-<title>FIONAH ENGINE v1.0</title>
+<title>FIONAH ENGINE v1.2</title>
 <style>
   :root {
     --bg: #070b1a; --panel: #121a33; --panel2: #0f1730; --line: #1f2a4a;
@@ -46,7 +46,7 @@
     font-size: 13px; font-family: inherit; outline: none; transition: border-color 0.2s;
   }
   textarea:focus, input:focus { border-color: var(--accent); }
-  textarea { min-height: 160px; resize: vertical; }
+  textarea { min-height: 220px; resize: vertical; }
   
   button {
     cursor: pointer; border: 0; border-radius: 10px; padding: 10px 14px;
@@ -94,8 +94,8 @@
 
 <header>
   <div>
-    <h1>⚽ FIONAH ENGINE v1.0</h1>
-    <div class="sub">Football Intelligence & Odds Normalization Heuristic Architecture</div>
+    <h1>⚽ FIONAH ENGINE v1.2</h1>
+    <div class="sub">Universal Bookmaker Parser · Zero LLM Math · Difflib Entity Verification</div>
   </div>
   <div class="row">
     <span id="statusPill" class="pill"><span class="dot"></span><span id="statusText">connecting…</span></span>
@@ -103,14 +103,12 @@
 </header>
 
 <main>
-  <!-- BATCH SLATE EVALUATOR -->
   <section class="card">
-    <h2>Batch Slate Evaluator · Synchronized Multi-Format Parser</h2>
+    <h2>Batch Slate Evaluator · Universal Multi-Format Parser</h2>
     <p style="color:var(--muted);font-size:12.5px;margin:4px 0 10px 0">
-      Paste fixtures. The parser strips UI chrome (<code>+N Markets</code>, <code>• League</code>, timestamps). 
-      Every team is run through <b>Difflib Entity Verification</b>. Unverified entities are hard-rejected.
+      Paste directly from <b>SportPesa, Betika, Odibets, Mozzartbet, or 1xBet</b>. The engine uses an "Odds Anchor" strategy to find the 1X2 odds and extract the preceding team names, ignoring all dates, IDs, and market labels.
     </p>
-    <textarea id="rawInput" placeholder="Arsenal vs Chelsea 1.95 3.60 4.20&#10;Real Madrid - Barcelona 2.10 3.40 3.50&#10;+43 Markets&#10;• Premier League, Division 1&#10;Bayern Munich vs Dortmund 1.70 4.00 5.00"></textarea>
+    <textarea id="rawInput" placeholder="Paste your bookmaker data here...&#10;&#10;Example:&#10;22/09/26 - 22:00 | ID: 4508&#10;Arsenal W&#10;HB Koege W&#10;Home&#10;1.07&#10;Draw&#10;11.00&#10;Away&#10;30.00"></textarea>
     <div class="row" style="margin-top:10px">
       <button id="btnRun">Run Quantitative Evaluation</button>
       <button id="btnPreset" class="ghost">Load Preset</button>
@@ -119,9 +117,8 @@
     <div class="stat" id="parseStats"></div>
   </section>
 
-  <!-- SINGLE MATCH DEEP AUDIT -->
   <section class="card">
-    <h2>Single Match Deep Audit (with Agent 2 & 3 Inputs)</h2>
+    <h2>Single Match Deep Audit</h2>
     <div class="grid2">
       <div><label style="font-size:12px;color:var(--muted)">Home Team</label><input id="singleHome" placeholder="e.g. Arsenal"/></div>
       <div><label style="font-size:12px;color:var(--muted)">Away Team</label><input id="singleAway" placeholder="e.g. Chelsea"/></div>
@@ -136,10 +133,10 @@
     </div>
     <h3>Agent 2 & 3 Advanced Inputs (Optional)</h3>
     <div class="grid4">
-      <div><label style="font-size:11px;color:var(--muted)">Home Rest (Days)</label><input id="restH" type="number" value="5"/></div>
-      <div><label style="font-size:11px;color:var(--muted)">Away Rest (Days)</label><input id="restA" type="number" value="5"/></div>
-      <div><label style="font-size:11px;color:var(--muted)">Home VAEP Δ</label><input id="vaepH" type="number" step="0.01" value="0.0" placeholder="e.g. -0.15"/></div>
-      <div><label style="font-size:11px;color:var(--muted)">Away VAEP Δ</label><input id="vaepA" type="number" step="0.01" value="0.0" placeholder="e.g. -0.10"/></div>
+      <div><label style="font-size:11px;color:var(--muted)">Home Rest</label><input id="restH" type="number" value="5"/></div>
+      <div><label style="font-size:11px;color:var(--muted)">Away Rest</label><input id="restA" type="number" value="5"/></div>
+      <div><label style="font-size:11px;color:var(--muted)">Home VAEP Δ</label><input id="vaepH" type="number" step="0.01" value="0.0"/></div>
+      <div><label style="font-size:11px;color:var(--muted)">Away VAEP Δ</label><input id="vaepA" type="number" step="0.01" value="0.0"/></div>
     </div>
     <div class="row" style="margin-top:10px">
       <button id="btnSingle">Predict Match</button>
@@ -147,118 +144,154 @@
     <div id="singleResult" style="margin-top:12px"></div>
   </section>
 
-  <!-- UNVERIFIED FIXTURES -->
   <section class="card" id="unverifiedCard" style="display:none">
-    <h2>⚠️ Unverified Fixtures (Hard-Rejected by Entity Gatekeeper)</h2>
+    <h2>⚠️ Unverified Fixtures (Hard-Rejected)</h2>
     <p style="color:var(--muted);font-size:12.5px">These entries failed canonical matching. Never silently faked.</p>
     <div id="unverifiedList"></div>
   </section>
 
-  <!-- ACCUMULATORS -->
   <section class="card">
     <h2>Recommended Accumulators (Orthogonal Disjoint Sets · Fractional Kelly)</h2>
     <div id="accaList"><div class="empty">No accumulators yet. Run a batch evaluation.</div></div>
   </section>
 
-  <!-- EVALUATED MATCHES -->
   <section class="card">
     <h2>Evaluated Matches (Verified)</h2>
     <div id="evalList"><div class="empty">No evaluated matches yet.</div></div>
   </section>
 
-  <!-- BACKEND STATUS -->
   <section class="card">
     <h2>Real-Time Backend Status</h2>
     <div id="backendStatus"><div class="empty">Loading…</div></div>
   </section>
 </main>
 
-<div class="footer">
-  FIONAH ENGINE v1.0 · Zero LLM Math · No Hardcoded Multipliers · Disjoint Acca Guardrails
-</div>
+<div class="footer">FIONAH ENGINE v1.2 · Zero LLM Math · No Hardcoded Multipliers · Disjoint Acca Guardrails</div>
 
 <script>
-/* ═══════════════════════════════════════════════════════════════════════════
-   CONFIGURATION
-   ═══════════════════════════════════════════════════════════════════════════ */
-// ⚠️ IMPORTANT: This is pre-configured to your live Render backend.
-// If you serve this HTML from the SAME Render server, use "" (empty string).
-// If you open this file locally or host elsewhere, use the full URL.
+// ⚠️ Pre-configured for your live Render backend.
 const API_BASE = (location.hostname === "localhost" || location.hostname === "127.0.0.1" || location.hostname === "")
   ? "https://fionah-engine-5.onrender.com"
-  : ""; // same-origin when served from Render
+  : "";
 
 /* ═══════════════════════════════════════════════════════════════════════════
-   SYNCHRONIZED MULTI-FORMAT PARSER
+   UNIVERSAL ODDS-ANCHOR PARSER
+   Handles SportPesa, Betika, Odibets, Mozzartbet, 1xBet, etc.
    ═══════════════════════════════════════════════════════════════════════════ */
-const UI_CHROME = [
-  /^\s*\+?\s*\d+\s*(markets|more|events|games|bets|selections|legs)/i,
-  /^\s*[•\-\*]\s+.*(?:liga|league|division|serie|cup|conference|tier|group|stage|round)/i,
-  /^\s*(live|in[-\s]?play|prematch|cash\s*out|edit\s*bet|my\s*bets|bet\s*slip|payout|stake)/i,
-  /^\s*(popular|featured|top\s*picks|trending|hot|suggested|featured\s*events)/i,
-  /^\s*(both\s*teams|over|under|correct\s*score|double\s*chance|asian|handicap)/i,
-  /^\s*\d{1,2}:\d{2}\s*(am|pm|gmt|utc)?\s*$/i,
-  /^\s*(mon|tue|wed|thu|fri|sat|sun)\w*\s+\d{1,2}\s+\w+/i,
-  /^\s*$/, /^\s*#/
-];
-const ODDS_RE = /(\d{1,2}\.\d{1,2})\s+(\d{1,2}\.\d{1,2})\s+(\d{1,2}\.\d{1,2})/;
-const VS_RE = /\s+(?:vs\.?|v\.?|vs\s|-\s|—\s|–\s|\s-\s|\svs\s)\s*/i;
+
+function isUICrome(line) {
+  const patterns = [
+    /^\d{2}\/\d{2}\/\d{2}\s*-\s*\d{2}:\d{2}\s*\|\s*ID:\s*\d+/i,
+    /^\d{2}\/\d{2}\/\d{2}\s+\d{2}:\d{2}$/i,
+    /^(1X2|Double Chance|Over\/Under|Draw no bet|Home|Draw|Away|OVER|UNDER|Home Win|Away Win|Boosted Odds|x-up|Total|Goals|Handicap|Asian|Corner|Cards)$/i,
+    /^\+?\s*\d+\s*(markets|more|events|games|bets|selections|legs)/i,
+    /^[•\-\*]\s+.*(?:liga|league|division|serie|cup|conference|tier)/i,
+    /^(live|in[-\s]?play|prematch|cash\s*out|edit\s*bet|my\s*bets|bet\s*slip|payout|stake)/i,
+    /^(popular|featured|top\s*picks|trending|hot|suggested)/i,
+    /^\s*\d{1,2}:\d{2}\s*(am|pm|gmt|utc)?\s*$/i,
+    /^\s*(mon|tue|wed|thu|fri|sat|sun)\w*\s+\d{1,2}\s+\w+/i,
+    /^\d+$/ // Pure numbers (match IDs, market counts)
+  ];
+  return patterns.some(p => p.test(line.trim()));
+}
 
 function isValidTeamName(s) {
-  if (!s || s.trim().length < 2) return false;
+  if (!s || s.trim().length < 3) return false;
   s = s.trim();
-  if (/^\d+\.?\d*$/.test(s)) return false;
-  if (!/[a-zA-Z]/.test(s)) return false;
-  if (/^(draw|home|away|yes|no|over|under)$/i.test(s)) return false;
-  for (const p of UI_CHROME) if (p.test(s)) return false;
+  if (/^\d+\.?\d*$/.test(s)) return false; 
+  if (!/[a-zA-Z]/.test(s)) return false;   
+  const lower = s.toLowerCase();
+  if (["draw", "home", "away", "yes", "no", "over", "under", "total", "goals", "handicap", "asian", "corner", "cards", "1x2", "x-up", "boosted"].includes(lower)) return false;
   return true;
 }
 
 function parseRawBatchInput(raw) {
-  const lines = raw.split(/\r?\n/);
-  const fixtures = [], rejected = [];
-  for (const line of lines) {
-    const trimmed = line.trim();
-    if (!trimmed) continue;
-    if (UI_CHROME.some(p => p.test(trimmed))) { rejected.push({ line: trimmed, reason: "UI chrome" }); continue; }
-    const oddsMatch = trimmed.match(ODDS_RE);
-    if (!oddsMatch) { rejected.push({ line: trimmed, reason: "no 3-odds pattern" }); continue; }
-    const beforeOdds = trimmed.substring(0, oddsMatch.index).trim();
-    if (!beforeOdds) { rejected.push({ line: trimmed, reason: "no team names" }); continue; }
+  const fixtures = [];
+  const rejected = [];
+  const lines = raw.split(/\r?\n/).map(l => l.trim()).filter(l => l.length > 0);
+  
+  let i = 0;
+  while (i < lines.length) {
+    const line = lines[i];
     
-    const parts = beforeOdds.split(VS_RE).map(s => s.trim()).filter(Boolean);
-    let home, away;
-    if (parts.length >= 2) { home = parts[0]; away = parts[parts.length - 1]; }
-    else {
-      const dashParts = beforeOdds.split(/\s+[-–—]\s+/).map(s => s.trim()).filter(Boolean);
-      if (dashParts.length >= 2) { home = dashParts[0]; away = dashParts[dashParts.length - 1]; }
-      else { rejected.push({ line: trimmed, reason: "cannot split home/away" }); continue; }
-    }
-    if (!isValidTeamName(home) || !isValidTeamName(away)) {
-      rejected.push({ line: trimmed, reason: `invalid team name (home='${home}', away='${away}')` });
+    // Skip obvious UI chrome
+    if (isUICrome(line)) {
+      i++;
       continue;
     }
-    fixtures.push({ 
-      home, away, 
-      odds_home: parseFloat(oddsMatch[1]), 
-      odds_draw: parseFloat(oddsMatch[2]), 
-      odds_away: parseFloat(oddsMatch[3]) 
-    });
+    
+    // 1. Look ahead for 3 decimal odds (the "Anchor")
+    let oddsFound = [];
+    let oddsIndices = [];
+    let lookAhead = Math.min(i + 15, lines.length);
+    
+    for (let j = i; j < lookAhead; j++) {
+      const match = lines[j].match(/^(\d{1,2}\.\d{2})$/);
+      if (match) {
+        const val = parseFloat(match[1]);
+        if (val >= 1.01 && val <= 99.99) {
+          oddsFound.push(val);
+          oddsIndices.push(j);
+          if (oddsFound.length === 3) break;
+        }
+      }
+    }
+    
+    if (oddsFound.length === 3) {
+      // 2. Extract team names from the lines between current position and the first odd
+      const teamBlock = lines.slice(i, oddsIndices[0]).map(l => l.trim()).filter(l => l.length > 0);
+      const validTeamsInBlock = teamBlock.filter(l => isValidTeamName(l));
+      
+      if (validTeamsInBlock.length >= 2) {
+        const away = validTeamsInBlock[validTeamsInBlock.length - 1];
+        const home = validTeamsInBlock[validTeamsInBlock.length - 2];
+        
+        if (isValidTeamName(home) && isValidTeamName(away)) {
+          fixtures.push({
+            home: home,
+            away: away,
+            odds_home: oddsFound[0],
+            odds_draw: oddsFound[1],
+            odds_away: oddsFound[2]
+          });
+          // Advance pointer past the odds we just consumed
+          i = oddsIndices[2] + 1;
+          continue;
+        }
+      }
+    }
+    
+    // 3. Fallback: Single-line format "Team A vs Team B 1.95 3.60 4.20"
+    const singleLineMatch = line.match(/(.+?)\s+(?:vs\.?|v\.?|-)\s+(.+?)\s+(\d{1,2}\.\d{2})\s+(\d{1,2}\.\d{2})\s+(\d{1,2}\.\d{2})/i);
+    if (singleLineMatch) {
+      const home = singleLineMatch[1].trim();
+      const away = singleLineMatch[2].trim();
+      if (isValidTeamName(home) && isValidTeamName(away)) {
+        fixtures.push({
+          home: home, away: away,
+          odds_home: parseFloat(singleLineMatch[3]),
+          odds_draw: parseFloat(singleLineMatch[4]),
+          odds_away: parseFloat(singleLineMatch[5])
+        });
+        i++;
+        continue;
+      }
+    }
+    
+    i++;
   }
+  
   return { fixtures, rejected };
 }
 
 /* ═══════════════════════════════════════════════════════════════════════════
-   UI HELPERS
+   UI HELPERS & ACTIONS
    ═══════════════════════════════════════════════════════════════════════════ */
 const $ = id => document.getElementById(id);
 function escapeHtml(s) { return String(s||"").replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c])); }
 function tierBadge(t) { const c=["elite","strong","candidate","rejected"].includes(t?.toLowerCase())?t.toLowerCase():"candidate"; return `<span class="badge ${c}">${t||"CANDIDATE"}</span>`; }
 function verifiedBadge(v) { return v ? `<span class="badge verified">✓ verified</span>` : `<span class="badge unverified">✗ unverified</span>`; }
 
-/* ═══════════════════════════════════════════════════════════════════════════
-   ACTIONS
-   ═══════════════════════════════════════════════════════════════════════════ */
 $("btnClear").addEventListener("click", () => {
   $("rawInput").value = ""; $("parseStats").innerHTML = "";
   $("evalList").innerHTML = `<div class="empty">No evaluated matches yet.</div>`;
@@ -267,7 +300,7 @@ $("btnClear").addEventListener("click", () => {
 });
 
 $("btnPreset").addEventListener("click", () => {
-  $("rawInput").value = `Arsenal vs Chelsea 1.95 3.60 4.20\nReal Madrid - Barcelona 2.10 3.40 3.50\n+43 Markets\n• Premier League, Division 1\nBayern Munich vs Dortmund 1.70 4.00 5.00\nLive\nCash Out\nJuventus vs Napoli 2.30 3.20 3.20`;
+  $("rawInput").value = `22/09/26 - 22:00 | ID: 4508\nArsenal W\nHB Koege W\n1X2\nHome\n1.07\nDraw\n11.00\nAway\n30.00\n\n22/09/26 - 22:00 | ID: 2563\nJuventus W\nSL Benfica W\n1X2\nHome\n1.73\nDraw\n3.95\nAway\n4.40`;
 });
 
 $("btnRun").addEventListener("click", async () => {
@@ -277,12 +310,12 @@ $("btnRun").addEventListener("click", async () => {
   const { fixtures, rejected } = parseRawBatchInput(raw);
   $("parseStats").innerHTML = `
     <div class="item"><b>${fixtures.length}</b>fixtures parsed</div>
-    <div class="item"><b style="color:var(--bad)">${rejected.length}</b>UI chrome rejected</div>
+    <div class="item"><b style="color:var(--warn)">${rejected.length}</b>lines skipped (UI chrome)</div>
     <div class="item"><b>✓</b>Difflib enforced</div>
   `;
   
   if (!fixtures.length) { 
-    $("evalList").innerHTML = `<div class="empty">No valid fixtures after parsing.</div>`; 
+    $("evalList").innerHTML = `<div class="empty">No valid fixtures parsed. Ensure the text contains 1X2 decimal odds (e.g., 1.95 3.60 4.20).</div>`; 
     return; 
   }
   
@@ -298,7 +331,7 @@ $("btnRun").addEventListener("click", async () => {
     const data = await res.json();
     
     // 1. Render Evaluated
-    let html = `<table><thead><tr><th>Fixture</th><th>Verified</th><th>Pick</th><th>Prob</th><th>Odds</th><th>EV</th><th>xG</th><th>Rest/VAEP</th><th>Tier</th></tr></thead><tbody>`;
+    let html = `<table><thead><tr><th>Fixture</th><th>Verified</th><th>Pick</th><th>Prob</th><th>Odds</th><th>EV</th><th>xG</th><th>Tier</th></tr></thead><tbody>`;
     for (const p of (data.predictions || [])) {
       html += `<tr>
         <td><b>${escapeHtml(p.home)}</b> vs <b>${escapeHtml(p.away)}</b><div style="color:var(--muted);font-size:11px">${escapeHtml(p.league)}</div></td>
@@ -308,7 +341,6 @@ $("btnRun").addEventListener("click", async () => {
         <td>${(p.pick_odds||0).toFixed(2)}</td>
         <td>${((p.adj_edge||0)*100).toFixed(1)}%</td>
         <td>${(p.lambda_home||0).toFixed(2)} – ${(p.lambda_away||0).toFixed(2)}</td>
-        <td style="font-size:11px;color:var(--muted)">${p.reason||""}</td>
         <td>${tierBadge(p.confidence_tier)}</td>
       </tr>`;
     }
@@ -358,7 +390,7 @@ $("btnRun").addEventListener("click", async () => {
       $("accaList").innerHTML = ahtml;
     }
   } catch (e) {
-    $("evalList").innerHTML = `<div class="empty" style="color:var(--bad)">Backend error: ${escapeHtml(e.message)}. ${API_BASE ? 'Check API_BASE in index.html.' : 'Render may be waking up — wait 30s and retry.'}</div>`;
+    $("evalList").innerHTML = `<div class="empty" style="color:var(--bad)">Backend error: ${escapeHtml(e.message)}. ${API_BASE ? 'Check API_BASE.' : 'Render may be waking up — wait 30s and retry.'}</div>`;
   } finally {
     $("btnRun").disabled = false;
   }
@@ -411,7 +443,6 @@ $("btnSingle").addEventListener("click", async () => {
         <b style="color:var(--muted)">Elo Gap</b><span>${data.elo_gap.toFixed(0)} (H ${data.elo_home} · A ${data.elo_away})</span>
         <b style="color:var(--muted)">Over 2.5</b><span>${(data.p_over25*100).toFixed(1)}% · BTTS ${(data.p_btts*100).toFixed(1)}%</span>
         <b style="color:var(--muted)">Value Cat.</b><span>${escapeHtml(data.value_category||"")} · EV ${((data.adj_edge||0)*100).toFixed(1)}%</span>
-        <b style="color:var(--muted)">Agent 2/3</b><span style="font-size:11.5px;color:var(--muted)">${escapeHtml(data.reason||"")}</span>
       </div>
       <details><summary>Raw JSON</summary><pre>${escapeHtml(JSON.stringify(data,null,2))}</pre></details>
     </div>`;
@@ -422,9 +453,6 @@ $("btnSingle").addEventListener("click", async () => {
   }
 });
 
-/* ═══════════════════════════════════════════════════════════════════════════
-   BACKEND STATUS POLLING
-   ═══════════════════════════════════════════════════════════════════════════ */
 async function refreshStatus() {
   try {
     const r = await fetch(`${API_BASE}/api/health`).then(r => r.json());
