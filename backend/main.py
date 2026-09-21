@@ -1,48 +1,28 @@
 """
-═══════════════════════════════════════════════════════════════════════════════
-SOCCER INTELLIGENCE ENGINE v6.0 — 2026 QUANTITATIVE SYNDICATE BACKEND
-10-Pillar Architecture · RapidFuzz Entity Resolution · Time-Decayed Dixon-Coles
-VAEP Injury Adjustments · Rest Fatigue Index · Fractional Kelly Acca Builder
-Strict Guardrails: Zero LLM Math · No Hardcoded Multipliers · Disjoint Sets
-═══════════════════════════════════════════════════════════════════════════════
-Dependencies: fastapi, uvicorn, pydantic, rapidfuzz, scipy, numpy
-Deploy: Render / Vercel. Env: GEMINI_API_KEY (optional)
-═══════════════════════════════════════════════════════════════════════════════
+================================================================================
+FIONAH ENGINE v1.0 — Football Intelligence & Odds Normalization Heuristic Arch.
+10-Pillar Quantitative Syndicate · Zero LLM Math · RapidFuzz Entity Resolution
+Dixon-Coles Bivariate Poisson · Shin De-vigging · Fractional Kelly Acca Builder
+================================================================================
+Deploy: Render (Python/FastAPI). Env: GEMINI_API_KEY (optional for live research)
 """
-import os
-import re
-import math
-import time
-import json
-import datetime as dt
-import urllib.request
-import urllib.parse
+import os, re, math, time, json, urllib.request, urllib.parse
 from typing import List, Optional, Dict, Any, Tuple
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 
-# ─── OPTIONAL BUT RECOMMENDED 2026 LIBRARIES ───────────────────────────────
+# Optional but recommended 2026 libraries
 try:
     from rapidfuzz import process, fuzz
     HAS_RAPIDFUZZ = True
 except ImportError:
     HAS_RAPIDFUZZ = False
 
-try:
-    import numpy as np
-    from scipy.optimize import minimize
-    HAS_SCIPY = True
-except ImportError:
-    HAS_SCIPY = False
-
-# ─── APP SETUP ─────────────────────────────────────────────────────────────
-app = FastAPI(title="Soccer Intelligence Engine v6.0", version="6.0.0")
+app = FastAPI(title="FIONAH ENGINE", version="1.0.0")
 app.add_middleware(CORSMiddleware, allow_origins=["*"], allow_methods=["*"], allow_headers=["*"])
 
-GEMINI_API_KEY = os.getenv("GEMINI_API_KEY", "")
-
-# ─── CALIBRATED PRIORS & SEEDS ─────────────────────────────────────────────
+# ─── CALIBRATED PRIORS ─────────────────────────────────────────────────────
 DEFAULT_LAMBDA_HOME, DEFAULT_LAMBDA_AWAY, DEFAULT_RHO = 1.38, 1.12, -0.055
 DECAY_RATE_XI = 0.0065  # Time-decay half-life parameter
 
@@ -86,8 +66,8 @@ UI_CHROME_PATTERNS = [
 def is_valid_team_name(s: str) -> bool:
     if not s or len(s.strip()) < 2: return False
     s = s.strip()
-    if re.match(r"^\d+\.?\d*$", s): return False          # Pure number (e.g., "18")
-    if not re.search(r"[a-zA-Z]", s): return False         # Must contain letters
+    if re.match(r"^\d+\.?\d*$", s): return False
+    if not re.search(r"[a-zA-Z]", s): return False
     if s.lower() in {"draw", "home", "away", "yes", "no", "over", "under"}: return False
     for p in UI_CHROME_PATTERNS:
         if p.match(s): return False
@@ -102,7 +82,6 @@ def normalize_name(s: str) -> str:
     return clean
 
 def verify_team_entity(team_name: str, domain: str = "domestic") -> Dict[str, Any]:
-    """AGENT 1: Strict gatekeeper using RapidFuzz to prevent hallucinated entities."""
     if not is_valid_team_name(team_name):
         return {"verified": False, "source": "invalid_name", "canonical": team_name, "elo": 0.0,
                 "reason": "Fails basic validation (UI chrome, pure number, or malformed)"}
@@ -111,38 +90,30 @@ def verify_team_entity(team_name: str, domain: str = "domestic") -> Dict[str, An
     seeds = INTL_ELO_SEEDS if domain == "international" else CLUB_ELO_SEEDS
     canonical_list = list(seeds.keys())
     
-    # 1. Exact match
     if clean in canonical_list:
         return {"verified": True, "source": "exact_match", "canonical": clean.title(), "elo": seeds[clean]}
     
-    # 2. RapidFuzz fuzzy matching (prevents "18 vs 1" or typo errors)
     if HAS_RAPIDFUZZ:
         match = process.extractOne(clean, canonical_list, scorer=fuzz.WRatio)
-        if match and match[1] >= 85:  # 85% confidence threshold
-            matched_name = match[0]
-            return {"verified": True, "source": "rapidfuzz_fuzzy", "canonical": matched_name.title(), "elo": seeds[matched_name]}
+        if match and match[1] >= 85:
+            return {"verified": True, "source": "rapidfuzz_fuzzy", "canonical": match[0].title(), "elo": seeds[match[0]]}
     else:
-        # Fallback to substring if rapidfuzz not installed
         for k in canonical_list:
             if k in clean or clean in k:
                 return {"verified": True, "source": "substring_fallback", "canonical": k.title(), "elo": seeds[k]}
     
-    # 3. Hard rejection
     return {"verified": False, "source": "no_canonical_match", "canonical": team_name, "elo": 0.0,
             "reason": "No match in canonical registry (confidence < 85%). Hard rejected."}
 
 # ─── AGENT 3: TACTICAL xG, REST & ENVIRONMENTAL ADJUSTMENTS ──────────────
 def apply_fatigue_and_rest(lambda_base: float, rest_days: int, opponent_rest_days: int) -> float:
-    """Penalizes teams on short turnarounds (<=3 days) vs rested teams (>=6 days)."""
     if rest_days <= 3 and opponent_rest_days >= 6:
-        return round(lambda_base * 0.88, 3)  # 12% penalty to scoring expectancy
+        return round(lambda_base * 0.88, 3)
     if rest_days <= 3 and opponent_rest_days <= 3:
-        return round(lambda_base * 0.94, 3)  # 6% mutual fatigue penalty
+        return round(lambda_base * 0.94, 3)
     return lambda_base
 
 def apply_vaep_injury_adjustment(lambda_base: float, vaep_delta: float) -> float:
-    """AGENT 2 Placeholder: Downgrades baseline if star players are absent.
-    vaep_delta is negative (e.g., -0.15 means 15% reduction in efficiency)."""
     return round(lambda_base * (1.0 + vaep_delta), 3)
 
 # ─── AGENT 4: MARKET INTELLIGENCE & SHIN DE-BIASING ──────────────────────
@@ -231,13 +202,11 @@ def evaluate_1x2_value(p_h: float, p_d: float, p_a: float, fair_h: float, fair_d
     is_stalemate = (total_xg <= 2.40 and abs(p_h - p_a) <= 0.16)
     is_tactical_draw = (p_d >= 0.275 and eff_d >= 2.90 and (ev_d >= -0.04 or is_stalemate))
     
-    # High-Odds Targeting: Tactical Draw Signal
     if is_tactical_draw and (ev_d >= 0.04 or (ev_d > ev_h and ev_d > ev_a and is_stalemate)):
         return {"pick_1x2": "X", "pick_1x2_name": "Draw (X)", "pick_1x2_odds": round(eff_d, 2),
                 "pick_1x2_prob": round(p_d, 3), "pick_1x2_ev": round(ev_d, 3), "value_category": "TACTICAL_DRAW",
                 "is_high_odds_1x2": eff_d >= 2.50, "high_odds_reason": f"Tactical Draw: Low combined xG ({total_xg:.2f}) produces {p_d*100:.1f}% draw density. EV {ev_d*100:+.1f}%."}
     
-    # High-Odds Targeting: Asymmetric Favorite Vulnerability
     if p_a >= 0.27 and eff_a >= 2.65 and ev_a >= max(ev_h, ev_d):
         return {"pick_1x2": "2", "pick_1x2_name": f"{away} (2)", "pick_1x2_odds": round(eff_a, 2),
                 "pick_1x2_prob": round(p_a, 3), "pick_1x2_ev": round(ev_a, 3), "value_category": "VALUE_UNDERDOG",
@@ -271,22 +240,18 @@ class FixtureInput(BaseModel):
     odds_home: Optional[float] = None
     odds_draw: Optional[float] = None
     odds_away: Optional[float] = None
-    # AGENT 2 & 3 INPUTS (Optional, defaults to 0.0 neutral)
     rest_days_home: int = 5
     rest_days_away: int = 5
-    vaep_delta_home: float = 0.0  # e.g., -0.15 if key players out
+    vaep_delta_home: float = 0.0
     vaep_delta_away: float = 0.0
-    enable_ai_research: bool = False
 
 class BatchPredictionRequest(BaseModel):
     fixtures: List[FixtureInput]
-    enable_ai_research: bool = False
 
 # ─── CORE PREDICTOR PIPELINE ─────────────────────────────────────────────
 def predict_fixture(f: FixtureInput) -> Dict[str, Any]:
     domain = "international" if any(k in (f.league or "").lower() for k in ["world cup", "euro", "copa", "nations"]) else "domestic"
     
-    # AGENT 1: Entity Verification Gate
     v_home = verify_team_entity(f.home, domain)
     v_away = verify_team_entity(f.away, domain)
     
@@ -298,28 +263,22 @@ def predict_fixture(f: FixtureInput) -> Dict[str, Any]:
             "primary_pick": "NO BET", "confidence_tier": "REJECTED", "acca_eligible": False,
         }
     
-    # Base ELO
     elo_h, elo_a = v_home["elo"], v_away["elo"]
-    elo_diff = (elo_h + 60.0) - elo_a  # +60 HFA
+    elo_diff = (elo_h + 60.0) - elo_a
     
-    # Base Lambdas
     lambda_h = DEFAULT_LAMBDA_HOME * (10.0 ** (elo_diff / 1000.0))
     lambda_a = DEFAULT_LAMBDA_AWAY * (10.0 ** (-elo_diff / 1000.0))
     
-    # AGENT 3: Apply Rest/Fatigue & VAEP Adjustments
     lambda_h = apply_fatigue_and_rest(lambda_h, f.rest_days_home, f.rest_days_away)
     lambda_a = apply_fatigue_and_rest(lambda_a, f.rest_days_away, f.rest_days_home)
     lambda_h = apply_vaep_injury_adjustment(lambda_h, f.vaep_delta_home)
     lambda_a = apply_vaep_injury_adjustment(lambda_a, f.vaep_delta_away)
     
-    # AGENT 4: Shin De-vigging
     has_odds = (f.odds_home and f.odds_draw and f.odds_away and f.odds_home > 1.05)
     fair_market, margin, z_shin = de_vig_odds_shin(f.odds_home, f.odds_draw, f.odds_away) if has_odds else (None, 0.05, 0.02)
     
-    # AGENT 5: Dixon-Coles Grid
     dc = calculate_dixon_coles_grid(lambda_h, lambda_a, rho=DEFAULT_RHO)
     
-    # Blend Model with Market (65% Market, 35% Model if odds exist)
     if fair_market:
         p_home = (dc["p_home"] * 0.35) + (fair_market["1"] * 0.65)
         p_draw = (dc["p_draw"] * 0.35) + (fair_market["X"] * 0.65)
@@ -333,11 +292,9 @@ def predict_fixture(f: FixtureInput) -> Dict[str, Any]:
     fair_odds_d = round(1.0 / max(0.01, p_draw), 2)
     fair_odds_a = round(1.0 / max(0.01, p_away), 2)
     
-    # AGENT 6: Value Detection
     val_1x2 = evaluate_1x2_value(p_home, p_draw, p_away, fair_odds_h, fair_odds_d, fair_odds_a,
                                  f.odds_home, f.odds_draw, f.odds_away, lambda_h + lambda_a, f.home, f.away)
     
-    # Primary Pick Logic
     primary_pick, pick_odds, primary_prob, tier = "NO BET", 1.35, 0.0, "CANDIDATE"
     if p_home >= 0.64:
         primary_pick, pick_odds, primary_prob = f"{f.home} (1)", f.odds_home or fair_odds_h, p_home
@@ -384,7 +341,7 @@ def build_accumulators(predictions: List[Dict[str, Any]]) -> List[Dict[str, Any]
         legs, used_teams, comb_odds, comb_prob = [], set(), 1.0, 1.0
         for cand in sorted_cands:
             h, a = cand["home"].lower(), cand["away"].lower()
-            if h in used_teams or a in used_teams: continue  # Disjoint set guardrail
+            if h in used_teams or a in used_teams: continue
             legs.append(cand); used_teams.add(h); used_teams.add(a)
             comb_odds *= cand["pick_odds"]; comb_prob *= cand["primary_win_prob"]
             if comb_odds >= target_min_odds and len(legs) >= 2: break
@@ -393,7 +350,6 @@ def build_accumulators(predictions: List[Dict[str, Any]]) -> List[Dict[str, Any]
         if comb_odds < 3.00 or len(legs) < 2: return None
         
         ev = (comb_prob * comb_odds) - 1.0
-        # Fractional Kelly (Quarter-Kelly for safety): f = (bp - q) / b * 0.25
         b = comb_odds - 1.0; q = 1.0 - comb_prob
         kelly_stake = max(0.0, ((b * comb_prob) - q) / b * 0.25)
         
@@ -413,7 +369,15 @@ def build_accumulators(predictions: List[Dict[str, Any]]) -> List[Dict[str, Any]
 
 # ─── ENDPOINTS ───────────────────────────────────────────────────────────
 @app.get("/api/health")
-def health(): return {"status": "ok", "version": "6.0.0", "rapidfuzz_enabled": HAS_RAPIDFUZZ, "scipy_enabled": HAS_SCIPY}
+def health(): 
+    return {"status": "ok", "version": "1.0.0", "rapidfuzz_enabled": HAS_RAPIDFUZZ}
+
+@app.post("/api/predict")
+def predict_endpoint(fixture: FixtureInput):
+    try:
+        return predict_fixture(fixture)
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
 
 @app.post("/api/batch-predict")
 def batch_predict(req: BatchPredictionRequest):
@@ -421,7 +385,7 @@ def batch_predict(req: BatchPredictionRequest):
     verified = [p for p in predictions if p.get("verified")]
     unverified = [p for p in predictions if not p.get("verified")]
     return {
-        "engine": "v6.0-production", "count": len(predictions),
+        "engine": "FIONAH-v1.0", "count": len(predictions),
         "verified_count": len(verified), "rejected_count": len(unverified),
         "predictions": verified, "unverified_fixtures": unverified,
         "accumulators": build_accumulators(predictions),
