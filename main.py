@@ -4,7 +4,7 @@ FIONAH ENGINE v1.0 — Football Intelligence & Odds Normalization Heuristic Arch
 10-Pillar Quantitative Syndicate · Zero LLM Math · Built-in Difflib Entity Resolution
 Dixon-Coles Bivariate Poisson · Shin De-vigging · Fractional Kelly Acca Builder
 ================================================================================
-Deploy: Render (Python/FastAPI). Env: GEMINI_API_KEY (optional for live research)
+Deploy: Render (Python/FastAPI/Gunicorn). Serves BOTH API + Frontend.
 Dependencies: fastapi, uvicorn, pydantic, gunicorn (NO scipy/numpy/rapidfuzz needed)
 ================================================================================
 """
@@ -17,9 +17,11 @@ import difflib
 import urllib.request
 import urllib.parse
 import datetime as dt
+from pathlib import Path
 from typing import List, Optional, Dict, Any, Tuple
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import FileResponse, JSONResponse
 from pydantic import BaseModel
 
 # ─── APP SETUP ─────────────────────────────────────────────────────────────
@@ -149,26 +151,23 @@ def verify_team_entity(team_name: str, domain: str = "domestic") -> Dict[str, An
     seeds = INTL_ELO_SEEDS if domain == "international" else CLUB_ELO_SEEDS
     canonical_list = list(seeds.keys())
     
-    # 1. Exact match
     if clean in canonical_list:
         return {"verified": True, "source": "exact_match", "canonical": clean.title(), "elo": seeds[clean]}
     
-    # 2. ZERO-DEPENDENCY FUZZY MATCHING (Built-in difflib, no pip install needed)
     matches = difflib.get_close_matches(clean, canonical_list, n=1, cutoff=0.75)
     if matches:
         matched_name = matches[0]
         return {"verified": True, "source": "difflib_fuzzy", "canonical": matched_name.title(), "elo": seeds[matched_name]}
     
-    # 3. Hard rejection
     return {"verified": False, "source": "no_canonical_match", "canonical": team_name, "elo": 0.0,
             "reason": "No match in canonical registry (confidence < 75%). Hard rejected."}
 
 # ─── AGENT 3: TACTICAL xG, REST & ENVIRONMENTAL ADJUSTMENTS ──────────────
 def apply_fatigue_and_rest(lambda_base: float, rest_days: int, opponent_rest_days: int) -> float:
     if rest_days <= 3 and opponent_rest_days >= 6:
-        return round(lambda_base * 0.88, 3)  # 12% penalty
+        return round(lambda_base * 0.88, 3)
     if rest_days <= 3 and opponent_rest_days <= 3:
-        return round(lambda_base * 0.94, 3)  # 6% mutual fatigue penalty
+        return round(lambda_base * 0.94, 3)
     return lambda_base
 
 def apply_vaep_injury_adjustment(lambda_base: float, vaep_delta: float) -> float:
@@ -298,7 +297,6 @@ class FixtureInput(BaseModel):
     odds_home: Optional[float] = None
     odds_draw: Optional[float] = None
     odds_away: Optional[float] = None
-    # Agent 2 & 3 Advanced Inputs (Defaults to neutral)
     rest_days_home: int = 5
     rest_days_away: int = 5
     vaep_delta_home: float = 0.0
@@ -311,7 +309,6 @@ class BatchPredictionRequest(BaseModel):
 def predict_fixture(f: FixtureInput) -> Dict[str, Any]:
     domain = "international" if any(k in (f.league or "").lower() for k in ["world cup", "euro", "copa", "nations"]) else "domestic"
     
-    # AGENT 1: Entity Verification Gate
     v_home = verify_team_entity(f.home, domain)
     v_away = verify_team_entity(f.away, domain)
     
@@ -324,25 +321,21 @@ def predict_fixture(f: FixtureInput) -> Dict[str, Any]:
         }
     
     elo_h, elo_a = v_home["elo"], v_away["elo"]
-    elo_diff = (elo_h + 60.0) - elo_a  # +60 Home Field Advantage
+    elo_diff = (elo_h + 60.0) - elo_a
     
     lambda_h = DEFAULT_LAMBDA_HOME * (10.0 ** (elo_diff / 1000.0))
     lambda_a = DEFAULT_LAMBDA_AWAY * (10.0 ** (-elo_diff / 1000.0))
     
-    # AGENT 3: Apply Rest/Fatigue & VAEP Adjustments
     lambda_h = apply_fatigue_and_rest(lambda_h, f.rest_days_home, f.rest_days_away)
     lambda_a = apply_fatigue_and_rest(lambda_a, f.rest_days_away, f.rest_days_home)
     lambda_h = apply_vaep_injury_adjustment(lambda_h, f.vaep_delta_home)
     lambda_a = apply_vaep_injury_adjustment(lambda_a, f.vaep_delta_away)
     
-    # AGENT 4: Shin De-vigging
     has_odds = (f.odds_home and f.odds_draw and f.odds_away and f.odds_home > 1.05)
     fair_market, margin, z_shin = de_vig_odds_shin(f.odds_home, f.odds_draw, f.odds_away) if has_odds else (None, 0.05, 0.02)
     
-    # AGENT 5: Dixon-Coles Grid
     dc = calculate_dixon_coles_grid(lambda_h, lambda_a, rho=DEFAULT_RHO)
     
-    # Blend Model with Market (65% Market, 35% Model if odds exist)
     if fair_market:
         p_home = (dc["p_home"] * 0.35) + (fair_market["1"] * 0.65)
         p_draw = (dc["p_draw"] * 0.35) + (fair_market["X"] * 0.65)
@@ -356,11 +349,9 @@ def predict_fixture(f: FixtureInput) -> Dict[str, Any]:
     fair_odds_d = round(1.0 / max(0.01, p_draw), 2)
     fair_odds_a = round(1.0 / max(0.01, p_away), 2)
     
-    # AGENT 6: Value Detection
     val_1x2 = evaluate_1x2_value(p_home, p_draw, p_away, fair_odds_h, fair_odds_d, fair_odds_a,
                                  f.odds_home, f.odds_draw, f.odds_away, lambda_h + lambda_a, f.home, f.away)
     
-    # Primary Pick Logic
     primary_pick, pick_odds, primary_prob, tier = "NO BET", 1.35, 0.0, "CANDIDATE"
     if p_home >= 0.64:
         primary_pick, pick_odds, primary_prob = f"{f.home} (1)", f.odds_home or fair_odds_h, p_home
@@ -407,7 +398,7 @@ def build_accumulators(predictions: List[Dict[str, Any]]) -> List[Dict[str, Any]
         legs, used_teams, comb_odds, comb_prob = [], set(), 1.0, 1.0
         for cand in sorted_cands:
             h, a = cand["home"].lower(), cand["away"].lower()
-            if h in used_teams or a in used_teams: continue  # Disjoint set guardrail
+            if h in used_teams or a in used_teams: continue
             legs.append(cand); used_teams.add(h); used_teams.add(a)
             comb_odds *= cand["pick_odds"]; comb_prob *= cand["primary_win_prob"]
             if comb_odds >= target_min_odds and len(legs) >= 2: break
@@ -416,7 +407,6 @@ def build_accumulators(predictions: List[Dict[str, Any]]) -> List[Dict[str, Any]
         if comb_odds < 3.00 or len(legs) < 2: return None
         
         ev = (comb_prob * comb_odds) - 1.0
-        # Fractional Kelly (Quarter-Kelly for safety): f = (bp - q) / b * 0.25
         b = comb_odds - 1.0; q = 1.0 - comb_prob
         kelly_stake = max(0.0, ((b * comb_prob) - q) / b * 0.25)
         
@@ -435,9 +425,16 @@ def build_accumulators(predictions: List[Dict[str, Any]]) -> List[Dict[str, Any]
     return accas
 
 # ─── ENDPOINTS ───────────────────────────────────────────────────────────
+
+# ⭐⭐⭐ NEW: SERVE FRONTEND DIRECTLY FROM RENDER ⭐⭐⭐
 @app.get("/")
-def root():
-    return {"engine": "FIONAH ENGINE", "version": "1.0.0", "status": "online"}
+def serve_frontend():
+    """Serve the index.html file directly from Render."""
+    html_path = Path(__file__).parent / "index.html"
+    if html_path.exists():
+        return FileResponse(html_path, media_type="text/html")
+    return JSONResponse({"engine": "FIONAH ENGINE v1.0", "status": "online", 
+                         "message": "Backend is live. Add index.html to serve the UI."})
 
 @app.get("/api/health")
 def health():
