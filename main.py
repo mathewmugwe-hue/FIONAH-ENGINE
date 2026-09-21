@@ -1,58 +1,117 @@
 """
 ================================================================================
 FIONAH ENGINE v1.0 — Football Intelligence & Odds Normalization Heuristic Arch.
-10-Pillar Quantitative Syndicate · Zero LLM Math · RapidFuzz Entity Resolution
+10-Pillar Quantitative Syndicate · Zero LLM Math · Built-in Difflib Entity Resolution
 Dixon-Coles Bivariate Poisson · Shin De-vigging · Fractional Kelly Acca Builder
 ================================================================================
 Deploy: Render (Python/FastAPI). Env: GEMINI_API_KEY (optional for live research)
+Dependencies: fastapi, uvicorn, pydantic, gunicorn (NO scipy/numpy/rapidfuzz needed)
+================================================================================
 """
-import os, re, math, time, json, urllib.request, urllib.parse
+import os
+import re
+import math
+import time
+import json
+import difflib
+import urllib.request
+import urllib.parse
+import datetime as dt
 from typing import List, Optional, Dict, Any, Tuple
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 
-# Optional but recommended 2026 libraries
-try:
-    from rapidfuzz import process, fuzz
-    HAS_RAPIDFUZZ = True
-except ImportError:
-    HAS_RAPIDFUZZ = False
-
+# ─── APP SETUP ─────────────────────────────────────────────────────────────
 app = FastAPI(title="FIONAH ENGINE", version="1.0.0")
-app.add_middleware(CORSMiddleware, allow_origins=["*"], allow_methods=["*"], allow_headers=["*"])
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
 
 # ─── CALIBRATED PRIORS ─────────────────────────────────────────────────────
 DEFAULT_LAMBDA_HOME, DEFAULT_LAMBDA_AWAY, DEFAULT_RHO = 1.38, 1.12, -0.055
-DECAY_RATE_XI = 0.0065  # Time-decay half-life parameter
+WC_LAMBDA_HOME, WC_LAMBDA_AWAY, WC_RHO = 1.55, 1.18, +0.040
 
-INTL_ELO_SEEDS = {
+INTL_ELO_SEEDS: Dict[str, float] = {
     "argentina": 2150, "france": 2120, "spain": 2115, "england": 2045,
-    "brazil": 2040, "germany": 1935, "italy": 1950, "portugal": 1970,
-    "netherlands": 1975, "usa": 1845, "united states": 1845, "mexico": 1840,
-    "japan": 1885, "morocco": 1895, "south korea": 1805, "korea republic": 1805,
+    "brazil": 2040, "belgium": 1980, "netherlands": 1975, "portugal": 1970,
+    "colombia": 1960, "italy": 1950, "uruguay": 1940, "germany": 1935,
+    "croatia": 1910, "morocco": 1895, "japan": 1885, "senegal": 1855,
+    "usa": 1845, "united states": 1845, "mexico": 1840, "switzerland": 1835,
+    "denmark": 1820, "austria": 1815, "korea republic": 1805, "south korea": 1805,
+    "iran": 1795, "australia": 1785, "turkey": 1775, "ukraine": 1770,
+    "nigeria": 1760, "egypt": 1750, "ivory coast": 1745, "cameroon": 1730,
+    "algeria": 1725, "ghana": 1710, "ecuador": 1830, "chile": 1790,
+    "paraguay": 1765, "peru": 1760, "venezuela": 1740, "bolivia": 1610,
+    "kenya": 1395, "uganda": 1410, "tanzania": 1365, "south africa": 1690,
 }
 
-CLUB_ELO_SEEDS = {
+CLUB_ELO_SEEDS: Dict[str, float] = {
     "manchester city": 2060, "real madrid": 2050, "arsenal": 2005,
-    "liverpool": 1990, "bayern munich": 1985, "inter milan": 1975, "inter": 1975,
-    "barcelona": 1975, "bayer leverkusen": 1965, "paris saint-germain": 1955, "psg": 1955,
+    "liverpool": 1990, "bayern munich": 1985, "inter": 1975, "inter milan": 1975,
+    "barcelona": 1975, "bayer leverkusen": 1965, "paris saint-germain": 1955,
+    "paris saint germain": 1955, "paris st germain": 1955, "psg": 1955,
     "atletico madrid": 1930, "borussia dortmund": 1910, "dortmund": 1910,
     "juventus": 1895, "chelsea": 1890, "aston villa": 1880, "tottenham": 1870,
-    "ac milan": 1865, "newcastle": 1860, "manchester united": 1850,
-    "atalanta": 1845, "rb leipzig": 1840, "benfica": 1835, "roma": 1830,
+    "tottenham hotspur": 1870, "ac milan": 1865, "newcastle": 1860, "sporting cp": 1860,
+    "sporting lisbon": 1860, "manchester united": 1850, "atalanta": 1845,
+    "crvena zvezda": 1770, "red star belgrade": 1770, "rb leipzig": 1840,
+    "benfica": 1835, "sl benfica": 1835, "roma": 1830, "as roma": 1830,
     "real sociedad": 1825, "villarreal": 1820, "fc porto": 1820, "porto": 1820,
-    "brighton": 1815, "west ham": 1800, "marseille": 1795, "feyenoord": 1785,
-    "psv": 1780, "celtic": 1750, "rangers": 1740, "bournemouth": 1735,
-    "bologna": 1765, "lazio": 1770, "fiorentina": 1765, "napoli": 1860,
-    "monaco": 1820, "lille": 1805, "lyon": 1770, "lens": 1775, "sevilla": 1760,
-    "athletic bilbao": 1815, "real betis": 1765, "valencia": 1660, "girona": 1805,
-    "stuttgart": 1800, "wolfsburg": 1735, "freiburg": 1740, "werder bremen": 1655,
+    "brighton": 1815, "west ham": 1800, "marseille": 1795, "olympique marseille": 1795,
+    "feyenoord": 1785, "psv": 1780, "psv eindhoven": 1780, "celtic": 1750,
+    "rangers": 1740, "bournemouth": 1735, "afc bournemouth": 1735, "bologna": 1765,
+    "lazio": 1770, "fiorentina": 1765, "acf fiorentina": 1765, "napoli": 1860,
+    "torino": 1720, "monaco": 1820, "as monaco": 1820, "lille": 1805,
+    "lyon": 1770, "olympique lyon": 1770, "olympique lyonnais": 1770, "rennes": 1730,
+    "stade rennais": 1730, "lens": 1775, "sevilla": 1760, "athletic bilbao": 1815,
+    "athletic club": 1815, "real betis": 1765, "betis": 1765, "valencia": 1660,
+    "girona": 1805, "eintracht frankfurt": 1785, "eintracht fr": 1785,
+    "stuttgart": 1800, "vfb stuttgart": 1800, "wolfsburg": 1735, "freiburg": 1740,
+    "sc freiburg": 1740, "werder bremen": 1655, "augsburg": 1650, "hamburg": 1620,
+    "1. fc cologne": 1635, "1. fc koln": 1635, "cologne": 1635, "koln": 1635,
+    "borussia (mg)": 1650, "borussia mg": 1650, "borussia monchengladbach": 1650,
+    "mainz": 1640, "mainz 05": 1640, "brest": 1735, "stade brestois": 1735,
+    "parma": 1630, "genoa": 1640, "auxerre": 1610, "lorient": 1610, "venezia": 1590,
+    "deportivo a coruna": 1570, "deportivo la coruna": 1570, "le mans": 1480,
+    "ferencvaros": 1690, "viktoria plzen": 1680, "sparta prague": 1720,
+    "slavia prague": 1735, "union saint-gilloise": 1740, "club brugge": 1755,
+    "anderlecht": 1715, "nec nijmegen": 1600, "vasco da gama": 1710, "flamengo": 1780,
+    "palmeiras": 1790, "fluminense": 1740, "sao paulo": 1735, "corinthians": 1720,
+    "river plate": 1775, "boca juniors": 1760, "wimbledon": 1450, "mk dons": 1460,
+    "bastia": 1580, "cannes": 1450, "elana torun": 1420, "lech ii poznan": 1470,
+    "lech poznan": 1690, "lecce": 1540, "sassuolo": 1610, "empoli": 1560, "salernitana": 1490,
     "nottingham forest": 1810, "fulham": 1770, "crystal palace": 1755,
     "leeds": 1700, "leicester": 1740, "southampton": 1690, "sunderland": 1680,
 }
 
-# ─── AGENT 1: INGESTION & ENTITY VERIFICATION (RapidFuzz) ────────────────
+HIGH_ALTITUDE_STADIUMS: Dict[str, int] = {
+    "la paz": 3600, "bolivia": 3600, "the strongest": 3600, "bolivar": 3600,
+    "quito": 2850, "ecuador": 2850, "ldu quito": 2850, "independiente del valle": 2850,
+    "bogota": 2640, "millonarios": 2640, "santa fe": 2640,
+    "mexico city": 2240, "mexico": 2240, "america": 2240, "cruz azul": 2240, "pumas": 2240,
+    "toluca": 2660
+}
+
+STADIUM_COORDS: Dict[str, Tuple[float, float]] = {
+    "arsenal": (51.555, -0.108), "chelsea": (51.482, -0.191),
+    "tottenham": (51.604, -0.066), "liverpool": (53.431, -2.961),
+    "manchester city": (53.483, -2.200), "manchester united": (53.463, -2.291),
+    "aston villa": (52.509, -1.885), "newcastle": (54.976, -1.622),
+    "real madrid": (40.453, -3.688), "barcelona": (41.365, 2.156),
+    "atletico madrid": (40.436, -3.599), "bayern munich": (48.219, 11.625),
+    "borussia dortmund": (51.493, 7.452), "bayer leverkusen": (51.038, 7.002),
+    "inter milan": (45.478, 9.124), "ac milan": (45.478, 9.124), "inter": (45.478, 9.124),
+    "juventus": (45.109, 7.641), "paris saint-germain": (48.841, 2.253),
+    "psg": (48.841, 2.253), "marseille": (43.270, 5.396), "valencia": (39.475, -0.358),
+    "real sociedad": (43.301, -1.973), "benfica": (38.753, -9.185), "fc porto": (41.162, -8.584)
+}
+
+# ─── AGENT 1: INGESTION & ENTITY VERIFICATION (Zero-Dependency Difflib) ──
 UI_CHROME_PATTERNS = [
     re.compile(r"^\+?\s*\d+\s*(markets|more|events|games|bets|selections)", re.I),
     re.compile(r"^[•\-\*]\s+.*(?:liga|league|division|serie|cup|conference|tier)", re.I),
@@ -90,27 +149,26 @@ def verify_team_entity(team_name: str, domain: str = "domestic") -> Dict[str, An
     seeds = INTL_ELO_SEEDS if domain == "international" else CLUB_ELO_SEEDS
     canonical_list = list(seeds.keys())
     
+    # 1. Exact match
     if clean in canonical_list:
         return {"verified": True, "source": "exact_match", "canonical": clean.title(), "elo": seeds[clean]}
     
-    if HAS_RAPIDFUZZ:
-        match = process.extractOne(clean, canonical_list, scorer=fuzz.WRatio)
-        if match and match[1] >= 85:
-            return {"verified": True, "source": "rapidfuzz_fuzzy", "canonical": match[0].title(), "elo": seeds[match[0]]}
-    else:
-        for k in canonical_list:
-            if k in clean or clean in k:
-                return {"verified": True, "source": "substring_fallback", "canonical": k.title(), "elo": seeds[k]}
+    # 2. ZERO-DEPENDENCY FUZZY MATCHING (Built-in difflib, no pip install needed)
+    matches = difflib.get_close_matches(clean, canonical_list, n=1, cutoff=0.75)
+    if matches:
+        matched_name = matches[0]
+        return {"verified": True, "source": "difflib_fuzzy", "canonical": matched_name.title(), "elo": seeds[matched_name]}
     
+    # 3. Hard rejection
     return {"verified": False, "source": "no_canonical_match", "canonical": team_name, "elo": 0.0,
-            "reason": "No match in canonical registry (confidence < 85%). Hard rejected."}
+            "reason": "No match in canonical registry (confidence < 75%). Hard rejected."}
 
 # ─── AGENT 3: TACTICAL xG, REST & ENVIRONMENTAL ADJUSTMENTS ──────────────
 def apply_fatigue_and_rest(lambda_base: float, rest_days: int, opponent_rest_days: int) -> float:
     if rest_days <= 3 and opponent_rest_days >= 6:
-        return round(lambda_base * 0.88, 3)
+        return round(lambda_base * 0.88, 3)  # 12% penalty
     if rest_days <= 3 and opponent_rest_days <= 3:
-        return round(lambda_base * 0.94, 3)
+        return round(lambda_base * 0.94, 3)  # 6% mutual fatigue penalty
     return lambda_base
 
 def apply_vaep_injury_adjustment(lambda_base: float, vaep_delta: float) -> float:
@@ -240,6 +298,7 @@ class FixtureInput(BaseModel):
     odds_home: Optional[float] = None
     odds_draw: Optional[float] = None
     odds_away: Optional[float] = None
+    # Agent 2 & 3 Advanced Inputs (Defaults to neutral)
     rest_days_home: int = 5
     rest_days_away: int = 5
     vaep_delta_home: float = 0.0
@@ -252,6 +311,7 @@ class BatchPredictionRequest(BaseModel):
 def predict_fixture(f: FixtureInput) -> Dict[str, Any]:
     domain = "international" if any(k in (f.league or "").lower() for k in ["world cup", "euro", "copa", "nations"]) else "domestic"
     
+    # AGENT 1: Entity Verification Gate
     v_home = verify_team_entity(f.home, domain)
     v_away = verify_team_entity(f.away, domain)
     
@@ -264,21 +324,25 @@ def predict_fixture(f: FixtureInput) -> Dict[str, Any]:
         }
     
     elo_h, elo_a = v_home["elo"], v_away["elo"]
-    elo_diff = (elo_h + 60.0) - elo_a
+    elo_diff = (elo_h + 60.0) - elo_a  # +60 Home Field Advantage
     
     lambda_h = DEFAULT_LAMBDA_HOME * (10.0 ** (elo_diff / 1000.0))
     lambda_a = DEFAULT_LAMBDA_AWAY * (10.0 ** (-elo_diff / 1000.0))
     
+    # AGENT 3: Apply Rest/Fatigue & VAEP Adjustments
     lambda_h = apply_fatigue_and_rest(lambda_h, f.rest_days_home, f.rest_days_away)
     lambda_a = apply_fatigue_and_rest(lambda_a, f.rest_days_away, f.rest_days_home)
     lambda_h = apply_vaep_injury_adjustment(lambda_h, f.vaep_delta_home)
     lambda_a = apply_vaep_injury_adjustment(lambda_a, f.vaep_delta_away)
     
+    # AGENT 4: Shin De-vigging
     has_odds = (f.odds_home and f.odds_draw and f.odds_away and f.odds_home > 1.05)
     fair_market, margin, z_shin = de_vig_odds_shin(f.odds_home, f.odds_draw, f.odds_away) if has_odds else (None, 0.05, 0.02)
     
+    # AGENT 5: Dixon-Coles Grid
     dc = calculate_dixon_coles_grid(lambda_h, lambda_a, rho=DEFAULT_RHO)
     
+    # Blend Model with Market (65% Market, 35% Model if odds exist)
     if fair_market:
         p_home = (dc["p_home"] * 0.35) + (fair_market["1"] * 0.65)
         p_draw = (dc["p_draw"] * 0.35) + (fair_market["X"] * 0.65)
@@ -292,9 +356,11 @@ def predict_fixture(f: FixtureInput) -> Dict[str, Any]:
     fair_odds_d = round(1.0 / max(0.01, p_draw), 2)
     fair_odds_a = round(1.0 / max(0.01, p_away), 2)
     
+    # AGENT 6: Value Detection
     val_1x2 = evaluate_1x2_value(p_home, p_draw, p_away, fair_odds_h, fair_odds_d, fair_odds_a,
                                  f.odds_home, f.odds_draw, f.odds_away, lambda_h + lambda_a, f.home, f.away)
     
+    # Primary Pick Logic
     primary_pick, pick_odds, primary_prob, tier = "NO BET", 1.35, 0.0, "CANDIDATE"
     if p_home >= 0.64:
         primary_pick, pick_odds, primary_prob = f"{f.home} (1)", f.odds_home or fair_odds_h, p_home
@@ -341,7 +407,7 @@ def build_accumulators(predictions: List[Dict[str, Any]]) -> List[Dict[str, Any]
         legs, used_teams, comb_odds, comb_prob = [], set(), 1.0, 1.0
         for cand in sorted_cands:
             h, a = cand["home"].lower(), cand["away"].lower()
-            if h in used_teams or a in used_teams: continue
+            if h in used_teams or a in used_teams: continue  # Disjoint set guardrail
             legs.append(cand); used_teams.add(h); used_teams.add(a)
             comb_odds *= cand["pick_odds"]; comb_prob *= cand["primary_win_prob"]
             if comb_odds >= target_min_odds and len(legs) >= 2: break
@@ -350,6 +416,7 @@ def build_accumulators(predictions: List[Dict[str, Any]]) -> List[Dict[str, Any]
         if comb_odds < 3.00 or len(legs) < 2: return None
         
         ev = (comb_prob * comb_odds) - 1.0
+        # Fractional Kelly (Quarter-Kelly for safety): f = (bp - q) / b * 0.25
         b = comb_odds - 1.0; q = 1.0 - comb_prob
         kelly_stake = max(0.0, ((b * comb_prob) - q) / b * 0.25)
         
@@ -368,9 +435,13 @@ def build_accumulators(predictions: List[Dict[str, Any]]) -> List[Dict[str, Any]
     return accas
 
 # ─── ENDPOINTS ───────────────────────────────────────────────────────────
+@app.get("/")
+def root():
+    return {"engine": "FIONAH ENGINE", "version": "1.0.0", "status": "online"}
+
 @app.get("/api/health")
-def health(): 
-    return {"status": "ok", "version": "1.0.0", "rapidfuzz_enabled": HAS_RAPIDFUZZ}
+def health():
+    return {"status": "ok", "version": "1.0.0", "timestamp": dt.datetime.utcnow().isoformat()}
 
 @app.post("/api/predict")
 def predict_endpoint(fixture: FixtureInput):
@@ -381,17 +452,21 @@ def predict_endpoint(fixture: FixtureInput):
 
 @app.post("/api/batch-predict")
 def batch_predict(req: BatchPredictionRequest):
-    predictions = [predict_fixture(f) for f in req.fixtures]
-    verified = [p for p in predictions if p.get("verified")]
-    unverified = [p for p in predictions if not p.get("verified")]
-    return {
-        "engine": "FIONAH-v1.0", "count": len(predictions),
-        "verified_count": len(verified), "rejected_count": len(unverified),
-        "predictions": verified, "unverified_fixtures": unverified,
-        "accumulators": build_accumulators(predictions),
-        "guardrails_enforced": ["no_llm_math", "disjoint_accas", "rapidfuzz_entity_check", "no_invented_entities"]
-    }
+    try:
+        predictions = [predict_fixture(f) for f in req.fixtures]
+        verified = [p for p in predictions if p.get("verified")]
+        unverified = [p for p in predictions if not p.get("verified")]
+        return {
+            "engine": "FIONAH-v1.0", "count": len(predictions),
+            "verified_count": len(verified), "rejected_count": len(unverified),
+            "predictions": verified, "unverified_fixtures": unverified,
+            "accumulators": build_accumulators(predictions),
+            "guardrails_enforced": ["no_llm_math", "disjoint_accas", "difflib_entity_check", "no_invented_entities"]
+        }
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
 
 if __name__ == "__main__":
     import uvicorn
-    uvicorn.run(app, host="0.0.0.0", port=int(os.getenv("PORT", 8000)))
+    port = int(os.getenv("PORT", 8000))
+    uvicorn.run(app, host="0.0.0.0", port=port)
