@@ -181,9 +181,12 @@
 /* ═══════════════════════════════════════════════════════════════════════════
    CONFIGURATION
    ═══════════════════════════════════════════════════════════════════════════ */
-// ⚠️ IMPORTANT: This is pre-configured to your live Render backend. 
-// If your Render URL changes, update it here.
-const API_BASE = "https://fionah-engine-5.onrender.com";
+// ⚠️ IMPORTANT: This is pre-configured to your live Render backend.
+// If you serve this HTML from the SAME Render server, use "" (empty string).
+// If you open this file locally or host elsewhere, use the full URL.
+const API_BASE = (location.hostname === "localhost" || location.hostname === "127.0.0.1" || location.hostname === "")
+  ? "https://fionah-engine-5.onrender.com"
+  : ""; // same-origin when served from Render
 
 /* ═══════════════════════════════════════════════════════════════════════════
    SYNCHRONIZED MULTI-FORMAT PARSER
@@ -204,8 +207,8 @@ const VS_RE = /\s+(?:vs\.?|v\.?|vs\s|-\s|—\s|–\s|\s-\s|\svs\s)\s*/i;
 function isValidTeamName(s) {
   if (!s || s.trim().length < 2) return false;
   s = s.trim();
-  if (/^\d+\.?\d*$/.test(s)) return false; // Pure number
-  if (!/[a-zA-Z]/.test(s)) return false;   // Must contain letters
+  if (/^\d+\.?\d*$/.test(s)) return false;
+  if (!/[a-zA-Z]/.test(s)) return false;
   if (/^(draw|home|away|yes|no|over|under)$/i.test(s)) return false;
   for (const p of UI_CHROME) if (p.test(s)) return false;
   return true;
@@ -355,7 +358,7 @@ $("btnRun").addEventListener("click", async () => {
       $("accaList").innerHTML = ahtml;
     }
   } catch (e) {
-    $("evalList").innerHTML = `<div class="empty" style="color:var(--bad)">Backend error: ${escapeHtml(e.message)}. Check API_BASE in index.html.</div>`;
+    $("evalList").innerHTML = `<div class="empty" style="color:var(--bad)">Backend error: ${escapeHtml(e.message)}. ${API_BASE ? 'Check API_BASE in index.html.' : 'Render may be waking up — wait 30s and retry.'}</div>`;
   } finally {
     $("btnRun").disabled = false;
   }
@@ -437,7 +440,7 @@ async function refreshStatus() {
   } catch (e) {
     $("statusPill").classList.add("offline");
     $("statusText").textContent = "backend offline (Render may be sleeping)";
-    $("backendStatus").innerHTML = `<div class="empty" style="color:var(--bad)">Cannot reach backend at ${API_BASE}. Check URL or wait for Render to wake up.</div>`;
+    $("backendStatus").innerHTML = `<div class="empty" style="color:var(--bad)">Cannot reach backend at ${API_BASE || window.location.origin}. Check URL or wait for Render to wake up (free tier sleeps after 15min).</div>`;
   }
 }
 refreshStatus();
